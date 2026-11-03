@@ -191,7 +191,7 @@ function seed(){
 function migrate(d){
   d=d||{}; d.project=d.project||seed().project; d.units=d.units||[]; d.issues=d.issues||[]; d.logs=d.logs||[]; d.payments=d.payments||[]; d.seq=d.seq||0;
   if(!d.users||!d.users.length) d.users=REMOTE?[]:[{name:"admin",pin:"1234",role:"editor"}];
-  d.folderId=d.folderId||""; d.lastPull=d.lastPull||""; d.units.forEach(u=>{ if(!u.works){ u.works=STAGES.map(st=>({id:++d.seq,name:st[1],weight:st[2],contractor:u.contractor||"",budget:0,pct:(u.stages||{})[st[0]]||0})); delete u.stages; delete u.contractor; delete u.budget; } });
+  d.folderId=d.folderId||""; d.lastPull=d.lastPull||""; d.project.appUrl=d.project.appUrl||""; d.units.forEach(u=>{ if(!u.works){ u.works=STAGES.map(st=>({id:++d.seq,name:st[1],weight:st[2],contractor:u.contractor||"",budget:0,pct:(u.stages||{})[st[0]]||0})); delete u.stages; delete u.contractor; delete u.budget; } });
   return d;
 }
 function load(){ let d=null; try{const r=localStorage.getItem(CONFIG.STORAGE_KEY); if(r) d=JSON.parse(r);}catch(e){} return d?migrate(d):seed(); }
@@ -285,6 +285,13 @@ function progress(u){ const W=u.works||[]; const tw=W.reduce((a,w)=>a+Number(w.w
 function budget(u){ return (u.works||[]).reduce((a,w)=>a+Number(w.budget||0),0); }
 function contractors(u){ return [...new Set((u.works||[]).map(w=>w.contractor).filter(Boolean))]; }
 function statusIdx(u){ if(u.handedOver) return 3; const p=progress(u); return p>=100?2:p>0?1:0; }
+function houseApp(u){
+  if(u.appUrl) return String(u.appUrl).trim();
+  const t=String((S.project||{}).appUrl||"").trim(); if(!t) return "";
+  return t.replace(/\{house\}/gi,encodeURIComponent(u.id)).replace(/\{file\}/gi,encodeURIComponent(u.file||""));
+}
+function houseSheet(u){ return u.file?("https://docs.google.com/spreadsheets/d/"+u.file+"/edit"):""; }
+function openExt(url){ if(!url) return; window.open(url,"_blank","noopener"); }
 function isSync(u){ return (typeof u==="string"?(S.units.find(x=>x.id===u)||{}):u).src==="sync"; }
 function used(id,wid){ const u=S.units.find(x=>x.id===id);
   if(u&&u.src==="sync") return wid==null ? u.works.reduce((a,w)=>a+Number(w.used||0),0) : Number((u.works.find(w=>w.id==wid)||{}).used||0);
@@ -378,8 +385,8 @@ function units(){
     <select onchange="filt.block=this.value;render()"><option value="">គ្រប់ប្លុក</option>${blocks().map(b=>`<option ${filt.block===b?"selected":""}>${b}</option>`).join("")}</select>
     <select onchange="filt.status=this.value;render()"><option value="">គ្រប់ស្ថានភាព</option>${STATUS.map((s,i)=>`<option value="${i}" ${filt.status==i?"selected":""}>${s}</option>`).join("")}</select>
   </div>
-  <div class="card" style="padding:0 6px">${L.length?`<table><tr><th>លេខ</th><th class="hide-m">ប្រភេទ</th><th>វឌ្ឍនភាព</th><th>ស្ថានភាព</th><th class="hide-m">អ្នកម៉ៅការ</th><th class="hide-m" style="text-align:right">ថវិកា</th><th style="text-align:right">នៅសល់</th><th class="ed"></th></tr>
-  ${L.map(u=>{const p=progress(u),si=statusIdx(u);return `<tr class="click" onclick="openUnit('${u.id}')"><td><b>${u.id}</b>${isSync(u)?' <span class="tag info" title="ទាញពីឯកសារផ្ទះ">⇄</span>':""}</td><td class="hide-m">${esc(u.type)}</td><td><div class="row" style="gap:8px"><div class="bar ${si===1?"a":""}" style="flex:1"><i style="width:${p}%"></i></div><span class="pct">${p}%</span></div></td><td><span class="tag s${si}">${STATUS[si]}</span></td><td class="hide-m mini">${esc(contractors(u).join(", "))||"—"}</td><td class="hide-m" style="text-align:right;font-variant-numeric:tabular-nums">${budget(u)?money(budget(u)):"—"}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:${remain(u)<0?"var(--red)":"inherit"}">${budget(u)?money(remain(u)):"—"}</td><td class="ed" style="text-align:right"><button class="btn sm" onclick="event.stopPropagation();openUnitForm('${u.id}')">កែ</button></td></tr>`}).join("")}</table>`:`<div class="empty"><b>រកមិនឃើញផ្ទះ</b>ប្តូរតម្រង ឬបន្ថែមផ្ទះថ្មី</div>`}</div>`;
+  <div class="card" style="padding:0 6px">${L.length?`<table><tr><th>លេខ</th><th class="hide-m">ប្រភេទ</th><th>វឌ្ឍនភាព</th><th>ស្ថានភាព</th><th class="hide-m">អ្នកម៉ៅការ</th><th class="hide-m" style="text-align:right">ថវិកា</th><th style="text-align:right">នៅសល់</th><th></th></tr>
+  ${L.map(u=>{const p=progress(u),si=statusIdx(u);return `<tr class="click" onclick="openUnit('${u.id}')"><td><b>${u.id}</b>${isSync(u)?' <span class="tag info" title="ទាញពីឯកសារផ្ទះ">⇄</span>':""}</td><td class="hide-m">${esc(u.type)}</td><td><div class="row" style="gap:8px"><div class="bar ${si===1?"a":""}" style="flex:1"><i style="width:${p}%"></i></div><span class="pct">${p}%</span></div></td><td><span class="tag s${si}">${STATUS[si]}</span></td><td class="hide-m mini">${esc(contractors(u).join(", "))||"—"}</td><td class="hide-m" style="text-align:right;font-variant-numeric:tabular-nums">${budget(u)?money(budget(u)):"—"}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:${remain(u)<0?"var(--red)":"inherit"}">${budget(u)?money(remain(u)):"—"}</td><td style="text-align:right;white-space:nowrap">${(houseApp(u)||houseSheet(u))?`<button class="btn sm" title="បើកកម្មវិធីសំណង់" onclick="event.stopPropagation();openExt('${esc(houseApp(u)||houseSheet(u))}')">↗</button> `:""}<button class="btn sm ed" onclick="event.stopPropagation();openUnitForm('${u.id}')">កែ</button></td></tr>`}).join("")}</table>`:`<div class="empty"><b>រកមិនឃើញផ្ទះ</b>ប្តូរតម្រង ឬបន្ថែមផ្ទះថ្មី</div>`}</div>`;
 }
 
 function issues(){
@@ -438,6 +445,8 @@ function settings(){
     <div class="f2"><div class="f"><label>ឈ្មោះបូរី</label><input id="p_name" value="${esc(p.name)}"></div><div class="f"><label>ទីតាំង</label><input id="p_loc" value="${esc(p.location)}"></div>
     <div class="f"><label>ថ្ងៃចាប់ផ្តើម</label><input type="date" id="p_start" value="${p.start}"></div><div class="f"><label>ថ្ងៃបញ្ចប់គោលដៅ</label><input type="date" id="p_end" value="${p.end}"></div>
     <div class="f"><label>អ្នកគ្រប់គ្រងគម្រោង</label><input id="p_pm" value="${esc(p.pm)}"></div></div>
+    <div class="f"><label>តំណកម្មវិធីគ្រប់គ្រងសំណង់ (template)</label><input id="p_app" value="${esc(p.appUrl||"")}" placeholder="https://…/index.html?house={house}"></div>
+    <p class="mini" style="margin:-6px 0 12px"><b>{house}</b> = លេខផ្ទះ · <b>{file}</b> = Google Sheet ID របស់ផ្ទះ។ ទុកទទេ ប្រសិនបើប្រើតែតំណ Google Sheet។</p>
     <button class="btn pri" onclick="saveProject()">រក្សាទុក</button></div>
   <div class="card"><h2 style="margin-bottom:8px">ទិន្នន័យ</h2><p class="mini" style="margin-bottom:12px">ទិន្នន័យរក្សាទុកក្នុង browser នេះ។ នាំចេញជាទៀងទាត់ ឬភ្ជាប់ Google Sheets តាម CONFIG.API_URL ក្នុងកូដ។</p>
     <div class="row"><button class="btn" onclick="exportJSON()">នាំចេញ JSON</button><button class="btn ed" onclick="importJSON()">នាំចូល JSON</button><button class="btn" onclick="exportCSV()">នាំចេញ CSV ការងារ</button><button class="btn danger" onclick="resetAll()">លុបទាំងអស់</button></div></div>`;
@@ -455,6 +464,10 @@ function openUnit(id){
   openModal(`<div class="unithead"><h2>ផ្ទះ ${u.id}</h2><span class="tag s${si}">${STATUS[si]}</span></div>
   <p class="mini" style="margin-bottom:12px">${esc(u.type)} · ប្លុក ${u.block} ${u.sold?"· បានលក់":""}${u.note?" · "+esc(u.note):""}</p>
   ${isSync(u)?`<p class="mini syncnote">⇄ ទាញពីឯកសារផ្ទះ · ${esc(u.syncedAt||"")} — ការងារ និងថវិកាអានប៉ុណ្ណោះ (ព័ត៌មានផ្ទះកែបាន)</p>`:""}
+  ${(houseApp(u)||houseSheet(u))?`<div class="row" style="gap:8px;margin-bottom:12px">
+    ${houseApp(u)?`<button class="btn pri" onclick="openExt('${esc(houseApp(u))}')">↗ បើកកម្មវិធីគ្រប់គ្រងសំណង់</button>`:""}
+    ${houseSheet(u)?`<button class="btn" onclick="openExt('${esc(houseSheet(u))}')">↗ បើក Google Sheet</button>`:""}
+  </div>`:""}
   <div class="row" style="margin-bottom:8px"><div class="bar" style="flex:1"><i style="width:${progress(u)}%"></i></div><b id="u_prog">${progress(u)}%</b></div>
   <div class="kpis" style="margin-bottom:12px"><div class="kpi"><b style="font-size:20px">${money(budget(u))}</b><span>ថវិកាសរុប</span></div><div class="kpi warn"><b style="font-size:20px">${money(used(id))}</b><span>បានប្រើ (បានទូទាត់)</span></div><div class="kpi ${remain(u)<0?"bad":"good"}"><b style="font-size:20px">${money(remain(u))}</b><span>នៅសល់</span></div></div>
   <div class="unithead"><h3>ការងារ ${u.works.filter(w=>!w.budget).length?`<span class="tag warn">${u.works.filter(w=>!w.budget).length} គ្មានថវិកា</span>`:""}</h3><div class="row" style="gap:6px${isSync(u)?";display:none":""}"><button class="btn sm ed" onclick="openBudget('${id}')">ថវិកាការងារ</button><button class="btn sm ed" onclick="openWork('${id}')">+ ការងារ</button></div></div>
@@ -508,19 +521,20 @@ function saveWork(uid,wid){
 }
 function guardSync(id){ if(isSync(id)){ toast("ការងារ និងថវិកាមកពីឯកសារផ្ទះ — កែក្នុងឯកសារនោះ"); return false; } return true; }
 function openUnitForm(id){ if(!guard()) return;
-  const u=id?S.units.find(x=>x.id===id):{id:"",block:blocks()[0]||"A",type:TYPES[0],sold:false,note:""};
+  const u=id?S.units.find(x=>x.id===id):{id:"",block:blocks()[0]||"A",type:TYPES[0],sold:false,note:"",appUrl:""};
   openModal(`<h2>${id?"កែព័ត៌មានផ្ទះ":"បន្ថែមផ្ទះ"}</h2>
   <div class="f2"><div class="f"><label>លេខផ្ទះ</label><input id="u_id" value="${esc(u.id)}" placeholder="D5" ${id&&isSync(id)?"readonly title='មកពីឈ្មោះឯកសារផ្ទះ'":""}></div><div class="f"><label>ប្លុក</label><input id="u_block" value="${esc(u.block)}"></div>
   <div class="f"><label>ប្រភេទ</label><select id="u_type">${opts(TYPES,u.type)}</select></div></div>
   <div class="f"><label><input type="checkbox" id="u_sold" ${u.sold?"checked":""}> បានលក់</label></div>
   <div class="f"><label>កំណត់ចំណាំ</label><textarea id="u_note" rows="2">${esc(u.note)}</textarea></div>
+  <div class="f"><label>តំណកម្មវិធីសំណង់សម្រាប់ផ្ទះនេះ (ស្រេចចិត្ត)</label><input id="u_app" value="${esc(u.appUrl||"")}" placeholder="ទុកទទេ = ប្រើ template ក្នុងការកំណត់"></div>
   ${id?"":`<p class="mini">ការងារលំនាំដើម ${STAGES.length} មុខ (${STAGES.map(s=>s[1]).join(", ")}) នឹងបង្កើតដោយស្វ័យប្រវត្តិ — កំណត់អ្នកម៉ៅការរង និងថវិកាក្នុងទំព័រផ្ទះ</p>`}
   ${foot(`saveUnit('${id||""}')`)}`);
 }
 function saveUnit(old){
   const id=$("u_id").value.trim(); if(!id) return toast("បញ្ចូលលេខផ្ទះ");
   if(id!==old&&S.units.some(x=>x.id===id)) return toast("លេខផ្ទះនេះមានរួចហើយ");
-  const d={id,block:$("u_block").value.trim().toUpperCase()||"A",type:$("u_type").value,sold:$("u_sold").checked,note:$("u_note").value.trim()};
+  const d={id,block:$("u_block").value.trim().toUpperCase()||"A",type:$("u_type").value,sold:$("u_sold").checked,note:$("u_note").value.trim(),appUrl:$("u_app").value.trim()};
   if(old){const u=S.units.find(x=>x.id===old);Object.assign(u,d);[S.issues,S.payments].forEach(a=>a.forEach(x=>{if(x.unit===old)x.unit=id}));}
   else S.units.push({...d,works:newWorks()});
   S.units.sort((a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true})); save(); closeModal(); render(); toast("បានរក្សាទុក");
@@ -612,7 +626,7 @@ function saveUser(i){
   if(!S.users.some(u=>u.role==="editor")) { toast("ត្រូវមានអ្នកគ្រប់គ្រងយ៉ាងហោចណាស់ម្នាក់"); if(i>=0) S.users[i].role="editor"; else S.users[S.users.length-1].role="editor"; }
   if(ME&&i>=0&&S.users[i].name!==ME.name&&d.name===ME.name){} save(); closeModal(); render(); toast("បានរក្សាទុក");
 }
-function saveProject(){ if(!guard()) return; S.project={name:$("p_name").value.trim(),location:$("p_loc").value.trim(),start:$("p_start").value,end:$("p_end").value,pm:$("p_pm").value.trim()}; save(); render(); toast("បានរក្សាទុក"); }
+function saveProject(){ if(!guard()) return; S.project={name:$("p_name").value.trim(),location:$("p_loc").value.trim(),start:$("p_start").value,end:$("p_end").value,pm:$("p_pm").value.trim(),appUrl:$("p_app").value.trim()}; save(); render(); toast("បានរក្សាទុក"); }
 function resetAll(){ if(!guard()) return; if(confirm("លុបទិន្នន័យទាំងអស់ ហើយចាប់ផ្តើមថ្មី?")){const us=S.users; S=seed(); S.users=us; save(); render();toast("បានចាប់ផ្តើមថ្មី");} }
 
 /* ================= EXPORT / IMPORT ================= */
