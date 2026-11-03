@@ -244,12 +244,12 @@ async function doPull(full){
   if(dirty) await pushRemote();
   const el=$("pullLog"); const show=t=>{ if(el) el.innerHTML=t; };
   show("កំពុងទាញ…"); syncState("កំពុងទាញពីឯកសារផ្ទះ…");
-  let houses=0, scopes=0, skipped=[], removed=[], guardN=0;
+  let houses=0, scopes=0, empty=0, skipped=[], removed=[], guardN=0;
   try{
     while(true){
       const r=await api({action:"pull",name:ME.name,pin:ME.pin,full:!!full&&guardN===0});
       if(!r.ok){ show(""); return toast("ទាញបរាជ័យ: "+r.error); }
-      const p=r.report; houses+=p.houses; scopes+=p.scopes;
+      const p=r.report; houses+=p.houses; scopes+=p.scopes; empty+=p.empty||0;
       skipped=skipped.concat(p.skipped||[]); removed=removed.concat(p.removed||[]);
       VERSION=r.version;
       if(!r.done){ show(`កំពុងទាញ… ${p.to}/${p.total} ឯកសារ · ${houses} ផ្ទះ`); if(++guardN>200) break; continue; }
@@ -257,6 +257,7 @@ async function doPull(full){
       const log=$("pullLog");
       if(log) log.innerHTML=`បានទាញ <b>${houses}</b> ផ្ទះ · <b>${scopes}</b> ការងារ ពី <b>${p.total}</b> ឯកសារ ក្នុង folder "${esc(p.folder)}" (${esc(p.at)})`
         +(removed.length?`<br>បានដក ${removed.length} ផ្ទះ (ឯកសារលែងមានក្នុង folder): ${removed.map(esc).join(", ")}`:"")
+        +(empty?`<br><span class="mini">${empty} ផ្ទះមិនទាន់មាន BOQ (បង្ហាញជា 0%)</span>`:"")
         +(skipped.length?`<br><span style="color:var(--amber)">រំលង ${skipped.length}: ${skipped.map(esc).join("; ")}</span>`:"");
       syncState("ទាញរួចរាល់"); toast(`បានទាញ ${houses} ផ្ទះ`);
       return;
