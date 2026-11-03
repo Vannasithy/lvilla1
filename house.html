@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LHB Project Control</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: dark steel sidebar + concrete-grey work surface; dense ledger tables with group bands */
+:root{
+  --bg:#eceeec; --panel:#ffffff; --thead:#f5f6f5; --grp:#e3e8e6; --ink:#1b2328; --muted:#5b676d; --line:#d3d9d6; --line2:#e7ebe9;
+  --accent:#1f5673; --accent-ink:#ffffff; --accent-soft:#dbe8ef; --mark:#c97f00;
+  --side:#1d262b; --side-ink:#e6ebe9; --side-muted:#8e9ca2; --side-on:#2b373d;
+  --ok:#2f7d4f; --ok-bg:#e1f1e7; --warn:#9a5c00; --warn-bg:#fbefd9; --bad:#b3372e; --bad-bg:#f8e1df; --info:#1f5673; --info-bg:#dbe8ef;
+  --input:#ffffff; --shadow:0 10px 40px rgba(15,22,26,.18);
+  --f-ui:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-head:'Barlow Semi Condensed','Barlow',system-ui,sans-serif;
+  --f-num:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11171a; --panel:#192125; --thead:#1e272b; --grp:#232d32; --ink:#e2e8e5; --muted:#93a1a6; --line:#2e3a3f; --line2:#253035;
+  --accent:#6fb0d4; --accent-ink:#0c1418; --accent-soft:#1e3542; --mark:#f0a72d;
+  --side:#0c1114; --side-ink:#e2e8e5; --side-muted:#7f8d93; --side-on:#1d272c;
+  --ok:#62c48a; --ok-bg:#183326; --warn:#e8a641; --warn-bg:#352816; --bad:#ec7065; --bad-bg:#3a1d1b; --info:#6fb0d4; --info-bg:#1e3542;
+  --input:#11171a; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11171a; --panel:#192125; --thead:#1e272b; --grp:#232d32; --ink:#e2e8e5; --muted:#93a1a6; --line:#2e3a3f; --line2:#253035;
+  --accent:#6fb0d4; --accent-ink:#0c1418; --accent-soft:#1e3542; --mark:#f0a72d;
+  --side:#0c1114; --side-ink:#e2e8e5; --side-muted:#7f8d93; --side-on:#1d272c;
+  --ok:#62c48a; --ok-bg:#183326; --warn:#e8a641; --warn-bg:#352816; --bad:#ec7065; --bad-bg:#3a1d1b; --info:#6fb0d4; --info-bg:#1e3542;
+  --input:#11171a; --shadow:0 10px 40px rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%}
+.side{background:var(--side);color:var(--side-ink);padding-block:18px;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:14px;display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:34px;height:34px;border-radius:5px;background:var(--mark);color:#1b1306;display:grid;place-items:center;font:700 13px var(--f-head);letter-spacing:.04em;flex:none}
+.brand b{font:700 15px var(--f-head);letter-spacing:.02em;display:block}
+.brand span{font-size:11.5px;color:var(--side-muted);display:block;line-height:1.25}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:5px;color:var(--side-ink);font-weight:500}
+.nav button:hover{background:var(--side-on)}
+.nav button.on{background:var(--side-on);box-shadow:inset 3px 0 0 var(--mark)}
+.nav button:focus-visible{outline:2px solid var(--mark)}
+.nav .no{font:500 11px var(--f-num);color:var(--side-muted);width:16px}
+.me{margin-top:auto;border-top:1px solid var(--side-on);padding-top:14px;display:flex;flex-direction:column;gap:8px}
+.me b{display:block}
+.me span{font-size:12px;color:var(--side-muted)}
+.me button{all:unset;cursor:pointer;font-size:12.5px;color:var(--side-muted);text-decoration:underline}
+.main{padding-block:22px 60px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));min-width:0}
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:auto;z-index:20;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));gap:10px;flex-direction:column}
+  .nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:2px}
+  .nav button{white-space:nowrap;padding:6px 10px}
+  .nav button.on{box-shadow:inset 0 -3px 0 var(--mark)}
+  .me{display:none}
+  .mobile-me{display:flex!important}
+  .main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+.syncline{display:flex;gap:10px;align-items:center}
+.syncst{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--side-muted)}
+.syncst::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.syncst.pending::before,.syncst.saving::before{background:var(--mark)}
+.syncst.error::before{background:var(--bad)}
+.syncst.local::before{background:var(--side-muted)}
+.chip .bd2{margin-left:6px;font:600 11px var(--f-num);background:var(--mark);color:#1b1306;border-radius:999px;padding:1px 7px}
+.nav .bd{margin-left:auto;font:600 11px var(--f-num);background:var(--mark);color:#1b1306;border-radius:999px;padding:1px 7px}
+.alert{border:1px solid var(--bad);background:var(--bad-bg);border-radius:6px;padding:10px 14px;margin-bottom:16px;display:flex;flex-direction:column;gap:3px}
+.alert.warn{border-color:var(--warn);background:var(--warn-bg)}
+.mobile-me{display:none;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--side-muted)}
+.mobile-me button{all:unset;cursor:pointer;text-decoration:underline}
+.ph{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.eyebrow{font:600 11.5px var(--f-head);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+h1{font:700 27px/1.15 var(--f-head);margin:2px 0 0;text-wrap:balance}
+h2{font:700 17px var(--f-head);margin:0;letter-spacing:.01em}
+h3{font:700 20px var(--f-head);margin:0 0 14px}
+.tags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{cursor:pointer;font-weight:600;font-size:13px;padding:7px 13px;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:3px 9px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.lnk{all:unset;cursor:pointer;color:var(--accent);font-weight:600;font-size:12.5px}
+.lnk:hover{text-decoration:underline}
+.lnk.bad{color:var(--bad)}
+.lnk:focus-visible{outline:2px solid var(--accent)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--line2);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.info{background:var(--info-bg);color:var(--info)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.kpi .l{font:600 11.5px var(--f-head);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.kpi .v{font:500 22px var(--f-num);margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12.5px;color:var(--muted);margin-top:2px}
+.kpi.hero .v{color:var(--accent)}
+.sec{margin-top:26px;display:flex;flex-direction:column;gap:10px}
+.sechead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+table{border-collapse:collapse;width:100%}
+th{font:600 11.5px var(--f-head);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--thead);white-space:nowrap}
+th.num{text-align:right}
+th.grpth{text-align:center;border-left:1px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;font-family:var(--f-num);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.code{font-family:var(--f-num);font-size:12.5px;color:var(--muted);white-space:nowrap}
+.bl{border-left:1px solid var(--line)}
+tr.grp td{background:var(--grp);font-weight:700}
+tr.grp td.num{font-weight:500}
+tr.tot td{background:var(--thead);font-weight:700;border-top:2px solid var(--line)}
+td.act{white-space:nowrap;text-align:right}
+td.act .lnk{margin-left:10px}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+.bar{height:7px;background:var(--line2);border-radius:4px;overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.barcell{display:flex;align-items:center;gap:8px;min-width:130px}
+.barcell .num{min-width:48px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-weight:600;font-size:12.5px;color:var(--ink)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip .c{font-family:var(--f-num);font-weight:400;margin-left:4px;opacity:.8}
+.empty{padding:26px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:6px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+input.in,select.in,textarea.in{background:var(--input);border:1px solid var(--line);border-radius:5px;padding:7px 9px;width:100%}
+input.qin{background:var(--input);border:1px solid var(--line);border-radius:4px;padding:4px 6px;width:88px;text-align:right;font-family:var(--f-num);font-size:13px}
+input.qin.over{border-color:var(--bad);color:var(--bad)}
+.search{max-width:260px}
+.ovl{position:fixed;inset:0;background:rgba(8,12,14,.55);z-index:60;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding-block:max(5vh,env(safe-area-inset-top,0px)) 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.modal{background:var(--panel);border-radius:8px;width:min(560px,100%);padding:22px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.modal.wide{width:min(1000px,100%)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.fgrid .full{grid-column:1/-1}
+@media (max-width:520px){.fgrid{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.mact{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;font-weight:600;z-index:80;box-shadow:var(--shadow)}
+.toast.bad{background:var(--bad);color:#fff}
+.split{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.card .top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.ipc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:14px}
+.ipc-head div{background:var(--panel);padding:9px 12px}
+.ipc-head .l{font:600 11px var(--f-head);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ipc-head .v{font-weight:600}
+.summ{display:grid;grid-template-columns:minmax(0,1fr) auto;max-width:520px;margin-left:auto;border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden}
+.summ div{padding:8px 12px;border-bottom:1px solid var(--line2)}
+.summ .num{font-size:13.5px}
+.summ .net{background:var(--accent-soft);font-weight:700;border-bottom:none}
+.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:34px}
+.sign div{border-top:1px solid var(--ink);padding-top:6px;font-size:12.5px}
+.sign b{display:block;font-size:13px}
+@media (max-width:600px){.sign{grid-template-columns:1fr}}
+.login{min-height:100%;display:grid;place-items:center;padding-block:30px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.lcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;width:min(460px,100%);padding:26px;display:flex;flex-direction:column;gap:16px}
+.ulist{display:flex;flex-direction:column;gap:6px}
+.ubtn{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:6px}
+.ubtn span{color:var(--muted);font-size:12.5px}
+.ubtn.on{border-color:var(--accent);background:var(--accent-soft)}
+.ubtn:focus-visible{outline:2px solid var(--accent)}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.ledger{font-size:12.5px}
+.sp{height:4px}
+@media print{.kpis{break-inside:avoid}.sec{break-inside:auto}.no-print{display:none!important}.side,.acts,.toolbar,.chips,td.act,.no-print{display:none!important}.shell{display:block}.main{padding:0}.tw{border:none;overflow:visible}body{background:#fff;color:#000}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<div id="app"></div>
+<div id="ov" class="ovl" hidden><div id="md" class="modal" role="dialog" aria-modal="true"></div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+/* ============ CLOUD DATABASE ============
+   Paste your Google Apps Script Web App URL (ends with /exec) between the quotes.
+   Leave it empty to keep data in this browser only. */
+/* ONE shared file for every house. The បូរី master links here as:
+     house.html?id=<Google Sheet ID>     -> one shared backend, set SHARED_API below
+     house.html?api=<Apps Script /exec>  -> this house has its own backend
+   Paste the single shared Apps Script /exec URL between the quotes. */
+const SHARED_API='https://script.google.com/macros/s/AKfycbyMQie8X4u17x4IHKlIbjh3Tg3YN8EiTHDSU8hGXNcPYwOdRxH7E8FDJO2StIiZ3Dk7Bw/exec';
+const QS=new URLSearchParams(location.search);
+const SHEET_ID=(QS.get('id')||'').trim();            // which house's Google Sheet
+const HOUSE=(QS.get('house')||QS.get('h')||'').trim();// house number, for the title only
+const API_URL=(QS.get('api')||'').trim()||SHARED_API;
+const CLOUD=!!API_URL;
+if(HOUSE)document.title=HOUSE+' — LHB Project Control';
+
+/* ============ DATA LAYER ============ */
+const KEY='lhb-project-control-v1';
+const uid=()=>Date.now().toString(36).slice(-4)+Math.random().toString(36).slice(2,8);
+const COLLS=['users','scopes','citems','sections','iitems','subs','claims','moves','prs','suppliers','reports','pos','invoices','ipcpay'];
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const lsDel=k=>{try{localStorage.removeItem(k)}catch(e){}};
+function emptyData(){const d={settings:{project:'',client:'',contractor:'',retention:5,vat:0,clientDays:30},seq:{}};COLLS.forEach(c=>d[c]=[]);return d}
+function addDays(s,k){const d=new Date(s+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+(+k||0));return d.toISOString().slice(0,10)}
+function daysTo(s){return Math.round((Date.parse(s+'T00:00:00Z')-Date.parse(today()+'T00:00:00Z'))/864e5)}
+/* brings data saved by older versions up to date */
+function migrate(d){
+  COLLS.forEach(c=>d[c]=d[c]||[]);
+  d.settings=Object.assign({project:'',client:'',contractor:'',retention:5,vat:0,clientDays:30},d.settings||{});
+  d.suppliers.forEach(s=>{if(s.days==null||s.days===''){const m=String(s.credit||'').match(/\d+/);s.days=m?+m[0]:0}});
+  if(!CLOUD&&d.users.length&&!d.users.some(u=>u.role==='FN'))d.users.push({id:d.users.some(u=>u.id==='u6')?uid():'u6',name:'Sokha Meas',role:'FN',pin:'1234'});
+  d.pos.forEach(o=>{if(o.status==='Delivered'&&d.moves.some(m=>String(m.ref||'').startsWith('PO-'+String(o.no).padStart(3,'0'))))o.status='Received'});
+  if(!CLOUD)d.prs.forEach(p=>{if(!['Being delivered','Delivered'].includes(p.status))return;
+    const sp=d.suppliers.find(x=>x.id===p.supplierId)||{};
+    const o={id:uid(),no:d.pos.length+1,date:p.date,prId:p.id,supplierId:p.supplierId||'',items:p.items.map(i=>({itemId:i.itemId,qty:i.qty,price:i.price})),status:p.status,creditDays:+sp.days||0,expected:'',deliveredDate:p.status==='Delivered'?p.date:'',dueDate:'',payments:[],note:p.note||'',hist:[]};
+    if(o.deliveredDate)o.dueDate=addDays(o.deliveredDate,o.creditDays);d.pos.push(o);p.items.forEach(i=>i.poId=o.id);p.status='Ordered'});
+  return d}
+function load(){if(CLOUD)return null;try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return null}}
+function save(){if(CLOUD){queueSync();return}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+/* ---- cloud sync: sends only the records that changed since the last load ---- */
+const C={token:null,rev:0,snap:{},sending:false,timer:null,status:'saved',err:'',boot:false,bootErr:'',users:[]};
+async function api(action,data){
+  let r;
+  try{r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action,token:C.token,sheet:SHEET_ID},data||{}))})}
+  catch(e){throw new Error('No connection to the cloud database')}
+  let j;try{j=await r.json()}catch(e){throw new Error(SHEET_ID||!SHARED_API?'The database URL did not answer correctly. Check the web app access is “Anyone”.':'This link has no house. Open it from the បូរី master, or add ?id=<Sheet ID>.')}
+  if(!j.ok){const e=new Error(j.error||'Request failed');e.auth=j.error==='AUTH';throw e}
+  return j}
+function takeSnap(){C.snap={};COLLS.forEach(c=>{const m={};(S[c]||[]).forEach(x=>m[x.id]=JSON.stringify(x));C.snap[c]=m});C.snap._settings=JSON.stringify(S.settings)}
+function diff(){const ch={};let cnt=0;
+  COLLS.forEach(c=>{const old=C.snap[c]||{},seen={},up=[];(S[c]||[]).forEach(x=>{seen[x.id]=1;if(old[x.id]!==JSON.stringify(x))up.push(x)});
+    const del=Object.keys(old).filter(id=>!seen[id]);if(up.length||del.length){ch[c]={up,del};cnt+=up.length+del.length}});
+  const settings=JSON.stringify(S.settings)!==C.snap._settings?S.settings:null;if(settings)cnt++;
+  return{ch,settings,cnt}}
+function queueSync(){clearTimeout(C.timer);C.timer=setTimeout(flush,700);setStatus('pending')}
+async function flush(){
+  clearTimeout(C.timer);C.timer=null;if(!C.token)return;
+  if(C.sending){queueSync();return}
+  const d=diff();if(!d.cnt){setStatus('saved');return}
+  const sent={};Object.entries(d.ch).forEach(([c,v])=>sent[c]={up:v.up.map(x=>[x.id,JSON.stringify(x)]),del:v.del});
+  const sentSettings=d.settings&&JSON.stringify(d.settings);
+  C.sending=true;setStatus('saving');
+  try{
+    const r=await api('sync',{changes:d.ch,settings:d.settings});
+    Object.entries(sent).forEach(([c,v])=>{v.up.forEach(([id,j])=>C.snap[c][id]=j);v.del.forEach(id=>delete C.snap[c][id])});
+    if(sentSettings)C.snap._settings=sentSettings;
+    C.rev=r.rev;let re=false;
+    Object.entries(r.assigned||{}).forEach(([id,no])=>{for(const c of ['prs','pos','invoices']){const p=S[c].find(x=>x.id===id);if(!p||p.no===no)continue;const was=JSON.stringify(p);p.no=no;if(C.snap[c][id]===was)C.snap[c][id]=JSON.stringify(p);re=true}});
+    C.sending=false;if(re)render();
+    if(diff().cnt)queueSync();else setStatus('saved');
+  }catch(e){
+    C.sending=false;
+    if(e.auth){sessionExpired();return}
+    if(/cannot|Only the/.test(e.message)){toast(e.message,'bad');try{await reloadCloud()}catch(x){}return}
+    setStatus('error',e.message);C.timer=setTimeout(flush,8000)}}
+const SYNC_TXT={local:'Saved in this browser',saved:'Saved to cloud',pending:'Saving…',saving:'Saving…',error:'Not saved — retrying'};
+function setStatus(s,msg){C.status=s;C.err=msg||'';paintSync()}
+function paintSync(){const s=CLOUD?C.status:'local';document.querySelectorAll('.syncst').forEach(el=>{el.className='syncst '+s;el.textContent=SYNC_TXT[s];el.title=C.err})}
+function applyData(d){S=migrate(Object.assign(emptyData(),d));if(me){me=S.users.find(x=>x.id===me.id)||null;if(!me){C.token=null;lsDel(KEY+'-tok');lsDel(KEY+'-uid')}}}
+async function loadUsers(){const r=await api('users');C.users=r.users;S.settings.project=r.project||''}
+async function reloadCloud(){const r=await api('load');applyData(r.data);C.rev=r.rev;takeSnap();setStatus('saved');if(!me)await loadUsers();render()}
+function signOutCloud(msg){clearTimeout(C.timer);C.timer=null;C.token=null;lsDel(KEY+'-tok');lsDel(KEY+'-uid');me=null;ui.pick=null;S=emptyData();C.snap={};render();if(msg)toast(msg);loadUsers().then(render).catch(()=>{})}
+function sessionExpired(){signOutCloud('Your session ended. Please sign in again.')}
+function handleErr(e){if(e.auth)sessionExpired();else toast(e.message,'bad')}
+async function bootCloud(){
+  C.boot=true;C.bootErr='';render();
+  try{
+    const t=lsGet(KEY+'-tok'),id=lsGet(KEY+'-uid');
+    if(t&&id){C.token=t;me={id};try{await reloadCloud();loadIpc()}catch(e){if(!e.auth)throw e;me=null;C.token=null;lsDel(KEY+'-tok');lsDel(KEY+'-uid')}}
+    if(!me){me=null;await loadUsers()}
+  }catch(e){me=null;C.bootErr=e.message}
+  C.boot=false;render()}
+async function poll(){
+  if(!CLOUD||!C.token||C.sending||C.timer||document.hidden||!$('#ov').hidden)return;
+  const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;
+  if(diff().cnt)return;
+  try{const r=await api('rev');if(r.rev!==C.rev)await reloadCloud()}catch(e){if(e.auth)sessionExpired()}}
+
+function seed(){
+  const s={settings:{project:'Borey Villa Type A (Sample)',client:'L Group',contractor:'LHB Construction',retention:5,vat:10,clientDays:21},
+    users:[],scopes:[],citems:[],sections:[],iitems:[],subs:[],claims:[],moves:[],prs:[],suppliers:[],reports:[],pos:[],invoices:[],ipcpay:[],seq:{}};
+  [['u1','Sithy','PM'],['u2','Dara Kim','SE'],['u3','Sreyneang Chan','QS'],['u4','Vuthy Ly','ST'],['u5','Rachana Heng','PC'],['u6','Sokha Meas','FN']].forEach(([id,name,role])=>s.users.push({id,name,role,pin:'1234'}));
+  [['sc1','Foundation'],['sc2','Structure'],['sc3','Brick Work'],['sc4','MEP'],['sc5','Ceiling']].forEach(([id,name])=>s.scopes.push({id,name}));
+  [['c1','sc1','Excavation for footings and ground beams','m3',85,6.5],['c2','sc1','Lean concrete 1:3:6, 50mm thick','m3',6.2,78],['c3','sc1','RC footing C25 incl. rebar & formwork','m3',28.5,260],['c4','sc1','RC ground beam C25 incl. rebar & formwork','m3',14.2,270],['c5','sc1','Backfill and compaction in layers','m3',52,4.8],
+   ['c6','sc2','RC columns C30','m3',18.6,420],['c7','sc2','RC beams C30','m3',24.3,390],['c8','sc2','RC slab 120mm C30','m2',186,68],['c9','sc2','RC staircase','m3',4.2,450],
+   ['c10','sc3','100mm brick wall incl. mortar','m2',640,11.5],['c11','sc3','200mm brick wall incl. mortar','m2',145,20],['c12','sc3','RC lintel & stiffener 100x100','m',210,7],
+   ['c13','sc4','Electrical wiring, conduits and DB','lot',1,6800],['c14','sc4','Water supply piping PPR','lot',1,2900],['c15','sc4','Sanitary drainage uPVC','lot',1,3400],
+   ['c16','sc5','Gypsum board ceiling 9mm incl. frame','m2',210,11.5],['c17','sc5','Moisture-resistant ceiling at wet areas','m2',32,14]
+  ].forEach(([id,scopeId,desc,unit,qty,rate])=>s.citems.push({id,scopeId,desc,unit,qty,rate}));
+  [['s1','sc3','Materials'],['s2','sc3','Lintel & stiffener'],['s3','sc3','Labour'],['s4','sc1','Concrete & rebar'],['s5','sc1','Labour'],['s6','sc2','Concrete & rebar'],['s7','sc2','Formwork'],['s8','sc2','Labour']].forEach(([id,scopeId,name])=>s.sections.push({id,scopeId,name}));
+  [['i1','s1','Clay brick 4-hole 8x8x18cm','pcs',58000,0.038],['i2','s1','Portland cement 50kg','bag',480,5.6],['i3','s1','River sand','m3',68,11],['i4','s1','Wall reinforcement mesh','roll',40,4.5],
+   ['i5','s2','Rebar DB10','kg',1200,0.82],['i6','s2','Rebar RB6','kg',420,0.85],['i7','s2','Premix concrete C20','m3',5.5,72],['i8','s2','Formwork plywood 12mm','sheet',25,13],
+   ['i9','s3','Brick laying labour','m2',785,2,false],['i10','s3','Lintel & stiffener labour','m',210,1.5,false],
+   ['i11','s4','Premix concrete C25','m3',43,76],['i12','s4','Rebar DB16','kg',2200,0.8],['i13','s4','Rebar DB12','kg',1500,0.8],['i14','s4','Lean concrete premix','m3',6.2,62],
+   ['i15','s5','Excavation labour','m3',85,3,false],['i16','s5','Rebar & formwork labour','m3',42.7,28,false],
+   ['i17','s6','Premix concrete C30','m3',53,85],['i18','s6','Rebar DB20','kg',3800,0.8],['i19','s6','Rebar DB16','kg',2600,0.8],['i20','s6','Rebar DB10','kg',1400,0.82],
+   ['i21','s7','Formwork plywood 12mm','sheet',160,13],['i22','s7','Timber 5x10cm','m3',6,180],['i23','s7','Steel props (rental)','pcs',300,1.2],
+   ['i24','s8','Concrete, rebar & formwork labour','m3',100.1,115,false]
+  ].forEach(([id,sectionId,name,unit,qty,rate,stock])=>s.iitems.push({id,sectionId,name,unit,qty,rate,stock:stock!==false}));
+  // aluminium: stock in pcs, cost by weight (kg per bar from the SAP item master)
+  s.scopes.push({id:'sc6',name:'Aluminium Doors & Windows'});
+  s.citems.push({id:'c18',scopeId:'sc6',desc:'Sliding door ZT100 incl. glass and hardware (H1)',unit:'set',qty:1,rate:1150});
+  s.sections.push({id:'s9',scopeId:'sc6',name:'Aluminium frame — sliding door ZT100'},{id:'s10',scopeId:'sc6',name:'Glass & hardware'});
+  const cat=sampleCatalog(),cf=c=>cat.find(r=>r.code===c);
+  [['I-AL-0001006',3],['I-AL-0001007',6],['I-AL-0001008',6],['I-AL-0001009',3],['I-AL-0001129',2],['I-AL-0001011',2],['I-AL-0001012',2],['I-AL-0001013',2]].forEach(([c,q],k)=>{const r=cf(c);s.iitems.push({id:'a'+(k+1),sectionId:'s9',code:c,name:r.name,unit:'pcs',qty:q,cu:'kg',cpu:r.cpu,rate:3.9,stock:true})});
+  s.iitems.push({id:'a9',sectionId:'s10',code:'I-GL-0000021',name:cf('I-GL-0000021').name+' 1830×2440',unit:'pcs',qty:4,cu:'m2',cpu:4.4652,rate:9,stock:true},
+    {id:'a10',sectionId:'s10',code:'I-HW-0000430',name:cf('I-HW-0000430').name,unit:'pcs',qty:2,cu:'',cpu:0,rate:7.02,stock:true},
+    {id:'a11',sectionId:'s10',code:'I-HW-0000407',name:cf('I-HW-0000407').name,unit:'pcs',qty:4,cu:'',cpu:0,rate:2,stock:true});
+  s.subs=[
+    {id:'b1',scopeId:'sc1',name:'Chea Vibol Team',phone:'096 222 4455',amount:1450,reqs:[{id:'q1',no:1,date:'2026-08-20',desc:'Excavation & footings',amount:900,status:'Paid'},{id:'q2',no:2,date:'2026-09-05',desc:'Ground beams & backfill',amount:550,status:'Paid'}]},
+    {id:'b2',scopeId:'sc2',name:'Chea Vibol Team',phone:'096 222 4455',amount:11500,reqs:[{id:'q3',no:1,date:'2026-09-10',desc:'Columns GF',amount:3000,status:'Paid'},{id:'q4',no:2,date:'2026-09-30',desc:'Beams & slab L1 part',amount:2800,status:'Paid'},{id:'q5',no:3,date:'2026-10-12',desc:'Slab L1 balance',amount:2400,status:'Requested'}]},
+    {id:'b3',scopeId:'sc3',name:'Sok Dara Masonry',phone:'012 345 678',amount:1885,reqs:[{id:'q6',no:1,date:'2026-09-28',desc:'GF walls 30%',amount:600,status:'Paid'},{id:'q7',no:2,date:'2026-10-10',desc:'GF walls & lintels',amount:350,status:'Requested'}]}
+  ];
+  s.scopes.push({id:'sc7',name:'Tiling'});
+  s.subs.push({id:'b4',scopeId:'sc7',name:'ខឿន សុឃាង',phone:'',amount:4198.02,reqs:[],ipcSheetId:'demo-tile',ipcContractor:'ខឿន សុឃាង'});
+  s.claims=[
+    {id:'k1',no:1,date:'2026-08-31',status:'Approved',lines:{c1:85,c2:6.2,c3:28.5,c4:14.2,c5:40,c6:5}},
+    {id:'k2',no:2,date:'2026-09-30',status:'Approved',lines:{c5:12,c6:9,c7:12,c8:70,c10:150,c11:40}},
+    {id:'k3',no:3,date:'2026-10-14',status:'Draft',lines:{c6:1.8,c7:5,c8:32,c10:74,c11:18,c12:52}}
+  ];
+  s.suppliers=[
+    {id:'p1',name:'Sovann Building Materials',contact:'Mr. Sovann',phone:'012 888 101',credit:'30 days',days:30,category:'Brick, cement, sand'},
+    {id:'p2',name:'Angkor Steel Trading',contact:'Ms. Lina',phone:'017 555 220',credit:'15 days',days:15,category:'Rebar, steel'},
+    {id:'p3',name:'Mekong Premix Concrete',contact:'Mr. Piseth',phone:'092 300 400',credit:'7 days',days:7,category:'Premix concrete'},
+    {id:'p4',name:'Phnom Penh Sand Supply',contact:'Mr. Rith',phone:'078 600 700',credit:'Cash on delivery',days:0,category:'Sand, aggregate'}
+  ];
+  let m=(date,itemId,type,qty,ref)=>s.moves.push({id:uid(),date,itemId,type,qty,ref,by:type==='OUT'?'Vuthy Ly':'Vuthy Ly'});
+  m('2026-08-10','i1','IN',10000,'Opening');m('2026-08-10','i2','IN',100,'Opening');m('2026-08-10','i3','IN',15,'Opening');m('2026-08-10','i5','IN',600,'Opening');
+  m('2026-08-14','i11','IN',43,'Direct pour');m('2026-08-14','i11','OUT',43,'Footings & GB');m('2026-08-12','i12','IN',2200,'Opening');m('2026-08-12','i13','IN',1500,'Opening');
+  m('2026-08-25','i12','OUT',2150,'Footings');m('2026-08-25','i13','OUT',1480,'Ground beams');
+  m('2026-09-02','i17','IN',36,'Direct pour');m('2026-09-20','i17','OUT',34,'Columns, beams, slab');m('2026-09-01','i18','IN',3000,'Opening');m('2026-09-01','i19','IN',2000,'Opening');m('2026-09-01','i21','IN',120,'Opening');
+  m('2026-09-22','i18','OUT',2600,'Structure L1');m('2026-09-22','i19','OUT',1800,'Structure L1');m('2026-09-18','i21','OUT',90,'Slab L1 formwork');
+  m('2026-09-25','i1','IN',20000,'PO-001');m('2026-09-25','i2','IN',150,'PO-001');m('2026-09-25','i3','IN',20,'PO-001');
+  m('2026-10-10','i20','IN',1400,'PO-003');m('2026-10-10','i19','IN',600,'PO-003');
+  m('2026-10-05','i1','OUT',21000,'GF walls');m('2026-10-05','i2','OUT',190,'GF walls');m('2026-10-05','i3','OUT',24,'GF walls');m('2026-10-09','i5','OUT',450,'Lintels GF');
+  s.prs=[
+    {id:'r1',no:1,date:'2026-09-18',needBy:'2026-09-24',source:'Stock',by:'Vuthy Ly',items:[{itemId:'i1',qty:20000,price:0.038,poId:'o1'},{itemId:'i2',qty:150,price:5.5,poId:'o1'},{itemId:'i3',qty:20,price:11,poId:'o1'}],status:'Ordered',supplierId:'',note:'For GF brick walls',hist:[]},
+    {id:'r2',no:2,date:'2026-10-08',needBy:'2026-10-16',source:'Site',by:'Dara Kim',items:[{itemId:'i5',qty:600,price:0.81,poId:'o2'},{itemId:'i6',qty:200,price:0.85,poId:'o2'}],status:'Ordered',supplierId:'',note:'Lintels L1',hist:[]},
+    {id:'r3',no:3,date:'2026-10-02',needBy:'2026-10-08',source:'Stock',by:'Vuthy Ly',items:[{itemId:'i20',qty:1400,price:0.82,poId:'o3'},{itemId:'i19',qty:600,price:0.8,poId:'o3'}],status:'Ordered',supplierId:'',note:'Slab L2 rebar',hist:[]},
+    {id:'r4',no:4,date:'2026-10-12',needBy:'2026-10-20',source:'Stock',by:'Vuthy Ly',items:[{itemId:'i18',qty:800,price:0.8},{itemId:'i22',qty:2,price:180}],status:'Received',supplierId:'',note:'Roof beams',hist:[]},
+    {id:'r5',no:5,date:'2026-10-13',needBy:'2026-10-18',source:'Site',by:'Dara Kim',items:[{itemId:'i3',qty:20,price:11},{itemId:'i4',qty:10,price:4.5}],status:'Pending',supplierId:'',note:'L1 brick walls start next week',hist:[]},
+    {id:'r6',no:6,date:'2026-10-24',needBy:'2026-10-28',source:'Site',by:'Dara Kim',items:[{itemId:'i17',qty:17,price:85,poId:'o4'}],status:'Ordered',supplierId:'',note:'Slab L2 pour',hist:[]}
+  ];
+  s.pos=[
+    {id:'o1',no:1,date:'2026-09-19',prId:'r1',supplierId:'p1',items:[{itemId:'i1',qty:20000,price:0.038},{itemId:'i2',qty:150,price:5.5},{itemId:'i3',qty:20,price:11}],status:'Received',creditDays:30,expected:'2026-09-24',deliveredDate:'2026-09-25',receivedDate:'2026-09-25',receivedBy:'Vuthy Ly',dueDate:'2026-10-25',payments:[{id:'y1',date:'2026-10-23',amount:1805,ref:'ABA transfer 231023',by:'Sokha Meas'}],note:'',hist:[]},
+    {id:'o2',no:2,date:'2026-10-09',prId:'r2',supplierId:'p2',items:[{itemId:'i5',qty:600,price:0.81},{itemId:'i6',qty:200,price:0.85}],status:'Being delivered',creditDays:15,expected:'2026-10-16',deliveredDate:'',dueDate:'',payments:[],note:'',hist:[]},
+    {id:'o3',no:3,date:'2026-10-03',prId:'r3',supplierId:'p2',items:[{itemId:'i20',qty:1400,price:0.82},{itemId:'i19',qty:600,price:0.8}],status:'Received',creditDays:15,expected:'2026-10-08',deliveredDate:'2026-10-10',receivedDate:'2026-10-10',receivedBy:'Vuthy Ly',dueDate:'2026-10-25',payments:[{id:'y2',date:'2026-10-20',amount:500,ref:'Cheque 004512',by:'Sokha Meas'}],note:'',hist:[]},
+    {id:'o4',no:4,date:'2026-10-25',prId:'r6',supplierId:'p3',items:[{itemId:'i17',qty:17,price:85}],status:'Delivered',creditDays:7,expected:'2026-10-28',deliveredDate:'2026-10-28',dueDate:'2026-11-04',payments:[],note:'',hist:[]}
+  ];
+  s.invoices=[{id:'v1',no:1,claimId:'k1',date:'2026-09-03',dueDate:'2026-09-24',amount:0,vat:10,payments:[],note:''},{id:'v2',no:2,claimId:'k2',date:'2026-10-02',dueDate:'2026-10-23',amount:0,vat:10,payments:[],note:''}];
+  s.invoices.forEach(i=>i.amount=r2(claimNet(s.claims.find(c=>c.id===i.claimId),s).net));
+  s.invoices[0].payments=[{id:'y3',date:'2026-09-22',amount:invTotal(s.invoices[0]),ref:'Client transfer',by:'Sokha Meas'}];
+  s.invoices[1].payments=[{id:'y4',date:'2026-10-28',amount:5000,ref:'Client part payment',by:'Sokha Meas'}];
+  s.ipcpay=[{id:'ip1',claimId:'w1:k1',ipcNo:'IPC_HE2026007-001',work:'ការងារការ៉ូ · Tile',contractor:'ខឿន សុឃាង',location:'SHOP HOUSE C - A18b [06]',amount:944.56,date:'2026-09-20',ref:'ABA transfer',by:'Sokha Meas'}];
+  s.reports=[
+    {id:'t1',date:'2026-09-30',by:'Dara Kim',weather:'Cloudy',manpower:24,notes:'Slab L1 formwork 30% complete. Brick work GF started on grid A–C.',progress:{c1:100,c2:100,c3:100,c4:100,c5:100,c6:60,c7:40,c8:30,c10:15,c11:20}},
+    {id:'t2',date:'2026-10-13',by:'Dara Kim',weather:'Rain',manpower:31,notes:'Slab L1 cast on 10 Oct. GF walls continuing; afternoon rain stopped work 2 hrs. Electrical conduits in slab done.',progress:{c6:85,c7:70,c8:55,c9:20,c10:35,c11:40,c12:25,c13:15,c14:10}}
+  ];
+  return s;
+}
+
+let S=emptyData();
+let me=null;
+const ui={view:'dash',iScope:'sc3',claimId:null,stScope:'all',stQ:'',sel:new Set(),procTab:'req',procF:'open',siteTab:'rep',subOpen:null,pick:null,stTab:'stock',poF:'open',apTab:'sup',apF:'topay',rk:null,rp:{t:'this'}};
+
+/* ============ ROLES ============ */
+const ROLES={PM:'Project Manager',SE:'Site Engineer',QS:'Quantity Surveyor',ST:'Stock Keeper',PC:'Procurement',FN:'Finance'};
+const ACCESS={dash:{PM:'e',SE:'v',QS:'v',FN:'v'},contract:{PM:'e',SE:'v',QS:'v',FN:'v'},internal:{PM:'e',SE:'v',QS:'e'},sub:{PM:'e',SE:'v',QS:'e',FN:'v'},claim:{PM:'e',SE:'v',QS:'e',FN:'v'},stock:{PM:'e',SE:'v',ST:'e'},proc:{PM:'e',SE:'v',PC:'e',FN:'v'},site:{PM:'e',SE:'e'},inv:{PM:'e',FN:'e',QS:'v'},ar:{PM:'e',FN:'e'},ap:{PM:'e',FN:'e'},rep:{PM:'e',SE:'e',QS:'e',ST:'e',PC:'e',FN:'e'},users:{PM:'e'}};
+const NAV=[['dash','Dashboard',''],['contract','Contract BOQ','1'],['internal','Internal BOQ','2'],['sub','Sub-contracts','3'],['claim','Progress Claim','4'],['stock','Stock','5'],['proc','Procurement','6'],['site','Site Team','7'],['inv','Invoices','8'],['ar','Receivables (AR)','9'],['ap','Payables (AP)','10'],['rep','Reports',''],['users','Users & Settings','']];
+const can=v=>(me&&ACCESS[v]&&ACCESS[v][me.role])||null;
+const ed=v=>can(v)==='e';
+const M=()=>!!me&&me.role!=='SE';
+const PAY=()=>!!me&&['PM','FN'].includes(me.role);
+
+/* ============ HELPERS ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const n=v=>+v||0;
+const r2=v=>Math.round(v*100)/100;
+const sum=(a,f)=>a.reduce((t,x)=>t+n(f(x)),0);
+const fq=v=>n(v).toLocaleString('en-US',{maximumFractionDigits:2});
+const fm=v=>(n(v)<0?'-':'')+'$'+Math.abs(n(v)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fp=v=>(n(v)*100).toFixed(1)+'%';
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fd=s=>{if(!s)return'—';const[y,m,d]=s.split('-');return `${+d} ${MON[+m-1]} ${y}`};
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const scope=id=>S.scopes.find(x=>x.id===id);
+const citem=id=>S.citems.find(x=>x.id===id);
+const iitem=id=>S.iitems.find(x=>x.id===id);
+const section=id=>S.sections.find(x=>x.id===id);
+const supplier=id=>S.suppliers.find(x=>x.id===id);
+const camt=it=>n(it.qty)*n(it.rate);
+const iamt=it=>n(it.qty)*(n(it.cpu)||1)*n(it.rate);   // internal BOQ: priced per costing unit (e.g. kg) when cpu is set
+const lineAmt=i=>n(i.qty)*(n(i.cpu)||1)*n(i.price);  // PR / PO lines
+const bar=(r,cls='')=>`<div class="barcell"><div class="bar" style="flex:1"><i style="width:${Math.min(100,Math.max(0,r*100)).toFixed(1)}%"></i></div><span class="num small">${fp(r)}</span></div>`;
+const prNo=p=>'PR-'+String(p.no).padStart(3,'0');
+const ipcNo=c=>'IPC '+String(c.no).padStart(2,'0');
+function secLetter(sec){const l=S.sections.filter(x=>x.scopeId===sec.scopeId);return String.fromCharCode(65+l.indexOf(sec))}
+function iCode(it){const sec=section(it.sectionId);if(!sec)return'';const l=S.iitems.filter(x=>x.sectionId===sec.id);return secLetter(sec)+'.'+(l.indexOf(it)+1)}
+function iScopeId(it){const sec=section(it.sectionId);return sec?sec.scopeId:null}
+function cCode(it){const si=S.scopes.findIndex(x=>x.id===it.scopeId);const l=S.citems.filter(x=>x.scopeId===it.scopeId);return (si+1)+'.'+(l.indexOf(it)+1)}
+
+function progressMap(){const m={};[...S.reports].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).forEach(r=>Object.entries(r.progress).forEach(([k,v])=>m[k]=n(v)));return m}
+function weightedProg(items,pm){const t=sum(items,camt);return t?sum(items,x=>camt(x)*(pm[x.id]||0)/100)/t:0}
+const PR_OPEN=p=>['Pending','Received','Part ordered'].includes(p.status);
+const PO_OPEN=o=>['Issued','Being delivered','Delivered'].includes(o.status); // not yet in stock
+const PO_CAN_CANCEL=o=>['Issued','Being delivered'].includes(o.status);
+const DELIV=o=>['Delivered','Received'].includes(o.status); // supplier has delivered → payable
+const AWAIT=()=>S.pos.filter(o=>o.status==='Delivered');   // waiting for Stock to receive
+function stockOf(itemId){let rec=0,iss=0,adj=0;S.moves.forEach(m=>{if(m.itemId!==itemId)return;if(m.type==='IN')rec+=n(m.qty);else if(m.type==='OUT')iss+=n(m.qty);else adj+=n(m.qty)});
+  const pend=sum(S.prs.filter(PR_OPEN).flatMap(p=>p.items.filter(i=>i.itemId===itemId&&!i.poId)),i=>i.qty)+sum(S.pos.filter(PO_OPEN).flatMap(o=>o.items.filter(i=>i.itemId===itemId)),i=>i.qty);const it=iitem(itemId);
+  return{boq:n(it&&it.qty),rec,iss,onHand:rec-iss+adj,pend,toBuy:Math.max(0,n(it&&it.qty)-rec-pend)}}
+function stockStatus(s){if(s.rec+s.pend>s.boq+1e-9)return[s.rec>s.boq+1e-9?'Over BOQ':'Over-ordered','bad'];if(s.onHand<=0&&s.rec<s.boq)return['Out of stock','bad'];if(s.toBuy>0)return['To purchase','warn'];if(s.pend>0)return['On order','info'];return['Covered','ok']}
+function claimRows(c,D=S){const prev=D.claims.filter(x=>x.no<c.no);const o={};D.citems.forEach(it=>{const p=sum(prev,x=>x.lines[it.id]);const cur=n(c.lines[it.id]);o[it.id]={prev:p,cur,cum:p+cur}});return o}
+const claimValue=c=>sum(S.citems,it=>n(c.lines[it.id])*n(it.rate));
+function claimNet(c,D=S){const R=claimRows(c,D);const cum=sum(D.citems,it=>R[it.id].cum*it.rate),prev=sum(D.citems,it=>R[it.id].prev*it.rate),cur=cum-prev,rp=n(D.settings.retention)/100,ret=cur*rp;return{cum,prev,cur,rp,ret,net:cur-ret}}
+const poNo=o=>'PO-'+String(o.no).padStart(3,'0');
+const invNo=i=>'INV-'+String(i.no).padStart(3,'0');
+const po=id=>S.pos.find(x=>x.id===id);
+const poTotal=o=>sum(o.items,lineAmt);
+const paidOf=x=>sum(x.payments||[],p=>p.amount);
+const termLabel=d=>n(d)?n(d)+' days credit':'Cash on delivery';
+const pl=k=>Math.abs(k)===1?'':'s';
+function dueTag(d){if(d<0)return[`Overdue ${-d} day${pl(d)}`,'bad'];if(d===0)return['Due today','bad'];if(d<=7)return[`Due in ${d} day${pl(d)}`,'warn'];return[`Due in ${d} days`,'info']}
+function poPay(o){const amt=poTotal(o),paid=paidOf(o),bal=r2(amt-paid);let days=null,tag;
+  if(o.status==='Cancelled')tag=['Cancelled',''];else if(bal<=0.004)tag=['Paid','ok'];
+  else if(!DELIV(o)||!o.dueDate)tag=[paid>0?'Deposit paid':'Pay after delivery',''];
+  else{days=daysTo(o.dueDate);tag=dueTag(days);if(paid>0)tag=[tag[0]+' · part paid',tag[1]]}
+  return{amt,paid,bal,days,tag}}
+const invTotal=i=>r2(n(i.amount)*(1+n(i.vat)/100));
+function invPay(i){const amt=invTotal(i),paid=paidOf(i),bal=r2(amt-paid),days=daysTo(i.dueDate);let tag=bal<=0.004?['Paid','ok']:dueTag(days);if(bal>0.004&&paid>0)tag=[tag[0]+' · part paid',tag[1]];return{amt,paid,bal,days,tag}}
+const invOfClaim=id=>S.invoices.find(i=>i.claimId===id);
+const readyClaims=()=>S.claims.filter(c=>c.status==='Approved'&&!invOfClaim(c.id)).sort((a,b)=>a.no-b.no);
+function alerts(){const a={};
+  if(['PM','ST'].includes(me.role))a.stock=AWAIT().length;
+  if(['PM','PC'].includes(me.role))a.proc=S.prs.filter(p=>p.status==='Pending').length;
+  if(PAY()){a.ap=S.pos.filter(o=>{const p=poPay(o);return DELIV(o)&&p.bal>0.004&&p.days<=7}).length+sum(S.subs,s=>(s.reqs||[]).filter(r=>r.status==='Requested').length)+ipcToPay().length;
+    a.inv=readyClaims().length;a.ar=S.invoices.filter(i=>{const p=invPay(i);return p.bal>0.004&&p.days<0}).length}
+  return a}
+
+/* ============ UI PRIMITIVES ============ */
+let toastT;function toast(msg,cls=''){const t=$('#toast');t.textContent=msg;t.className='toast '+cls;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600)}
+function modal(html,wide=false){const md=$('#md');md.className='modal'+(wide?' wide':'');md.innerHTML=html;$('#ov').hidden=false;const f=md.querySelector('input,select,textarea');if(f)f.focus()}
+function closeModal(){$('#ov').hidden=true;$('#md').innerHTML=''}
+let pendingYes=null;
+function confirmBox(msg,fn,label='Delete'){pendingYes=fn;modal(`<h3>Please confirm</h3><p>${msg}</p><div class="mact"><button class="btn" data-act="close">Cancel</button><button class="btn danger" data-act="confirmYes">${label}</button></div>`)}
+function field(f){const v=f.v??'';const id='f_'+f.k;let inp;
+  if(f.t==='select')inp=`<select class="in" id="${id}">${f.o.map(([a,b])=>`<option value="${esc(a)}" ${String(a)===String(v)?'selected':''}>${esc(b)}</option>`).join('')}</select>`;
+  else if(f.t==='textarea')inp=`<textarea class="in" id="${id}" rows="3">${esc(v)}</textarea>`;
+  else inp=`<input class="in" id="${id}" type="${f.t||'text'}" ${f.t==='number'?'step="any"':''} value="${esc(v)}" ${f.req?'required':''}>`;
+  return `<label class="f ${f.full?'full':''}" for="${id}">${esc(f.l)}${inp}</label>`}
+function form(title,fields,onSave,saveLabel='Save'){
+  modal(`<h3>${esc(title)}</h3><form id="mf" class="fgrid">${fields.map(field).join('')}<div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">${saveLabel}</button></div></form>`);
+  $('#mf').onsubmit=e=>{e.preventDefault();const v={};fields.forEach(f=>{const el=$('#f_'+f.k);v[f.k]=f.t==='number'?n(el.value):el.value.trim()});const err=onSave(v);if(err){toast(err,'bad');return}closeModal();save();render()}}
+
+/* ============ RENDER ============ */
+function render(){
+  const app=$('#app');if(IPC.raw)ipcApply();
+  if(!me){app.innerHTML=vLogin();return}
+  if(!can(ui.view))ui.view=NAV.find(x=>can(x[0]))[0];
+  const al=alerts();const nav=NAV.filter(x=>can(x[0])).map(([k,l,no])=>`<button class="${ui.view===k?'on':''}" data-act="nav" data-v="${k}"><span class="no">${no}</span>${l}${al[k]?`<span class="bd" title="Needs attention">${al[k]}</span>`:''}</button>`).join('');
+  app.innerHTML=`<div class="shell"><aside class="side">
+    <div class="brand"><div class="logo">LHB</div><div><b>Project Control</b><span>${esc(S.settings.project)}</span></div></div>
+    <div class="mobile-me"><span>${esc(me.name)} · ${ROLES[me.role]}</span><span class="syncst"></span><button data-act="logout">Sign out</button></div>
+    <nav class="nav">${nav}</nav>
+    <div class="me"><div><b>${esc(me.name)}</b><span>${ROLES[me.role]}</span></div><div class="syncline"><span class="syncst"></span>${CLOUD?'<button data-act="refresh">Refresh</button>':''}</div><button data-act="logout">Sign out</button></div>
+  </aside><main class="main">${V[ui.view]()}</main></div>`;
+  paintSync();
+}
+function ph(eyebrow,title,actions=''){const mode=can(ui.view);return `<div class="ph"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><div class="tags">${mode==='v'?'<span class="pill">View only</span>':''}${!M()&&ui.view!=='sub'?'<span class="pill">Prices hidden</span>':''}</div></div><div class="acts">${actions}</div></div>`}
+
+function vLogin(){
+  const users=CLOUD?C.users:S.users;
+  let body=`<div><div class="eyebrow" style="margin-bottom:8px">Choose your account</div><div class="ulist">${users.map(u=>`<button class="ubtn ${ui.pick===u.id?'on':''}" data-act="pickUser" data-id="${u.id}"><b>${esc(u.name)}</b><span>${ROLES[u.role]}</span></button>`).join('')}</div></div>
+  <form id="lf" class="fgrid" ${ui.pick?'':'hidden'}><label class="f full" for="pin">PIN<input class="in" id="pin" type="password" inputmode="numeric" autocomplete="off"></label><div class="mact"><button class="btn pri">Sign in</button></div></form>`;
+  if(CLOUD&&C.boot)body='<p class="hint">Connecting to the cloud database…</p>';
+  else if(CLOUD&&C.bootErr)body=`<p class="hint" style="color:var(--bad)">${esc(C.bootErr)}</p><div><button class="btn" data-act="retryBoot">Try again</button></div>`;
+  const hint=CLOUD?'Data is shared through the cloud database. Ask your Project Manager if you forgot your PIN.':'Sample data in this browser. Every sample account uses PIN 1234 — change PINs in Users &amp; Settings.';
+  return `<div class="login"><div class="lcard">
+  <div class="brand"><div class="logo">LHB</div><div><b style="font-size:18px">Project Control</b><span class="muted" style="color:var(--muted)">${esc(S.settings.project)}</span></div></div>
+  ${body}<p class="hint">${hint}</p></div></div>`}
+
+const V={};
+
+/* ---------- DASHBOARD ---------- */
+V.dash=()=>{
+  const pm=progressMap();const ct=sum(S.citems,camt);const ov=weightedProg(S.citems,pm);
+  const claimed=sum(S.claims,claimValue);
+  const subWait=sum(S.subs,s=>sum(s.reqs.filter(r=>r.status==='Requested'),r=>r.amount));
+  const openPR=S.prs.filter(PR_OPEN).length+S.pos.filter(PO_OPEN).length;
+  const toBuy=S.iitems.filter(i=>i.stock&&stockOf(i.id).toBuy>0).length;
+  const last=[...S.reports].sort((a,b)=>a.date<b.date?1:-1)[0];
+  const k=(l,v,s,c='')=>`<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  let tiles=k('Overall progress',fp(ov),'Weighted by Contract BOQ value','hero');
+  if(M())tiles+=k('Contract value',fm(ct),`${S.citems.length} items in ${S.scopes.length} scopes`)+k('Claimed to date',fm(claimed),`${fp(ct?claimed/ct:0)} of contract · ${S.claims.length} claims`)+k('Sub-contract requests',fm(subWait),'Waiting for payment');
+  tiles+=k('Open requests & orders',openPR,'Not yet delivered to stock')+k('Items to purchase',toBuy,'Stock below Internal BOQ');
+  if(PAY())tiles+=k('Receivable (AR)',fm(sum(S.invoices,i=>invPay(i).bal)),'Invoices not yet paid by client')+k('Payable to suppliers',fm(sum(S.pos.filter(DELIV),o=>poPay(o).bal)),'Delivered POs not yet paid');
+  const rows=S.scopes.map(sc=>{const its=S.citems.filter(x=>x.scopeId===sc.id);const b=sum(its,camt);
+    const ib=sum(S.iitems.filter(i=>{const s=section(i.sectionId);return s&&s.scopeId===sc.id}),iamt);
+    const cl=sum(S.claims,c=>sum(its,it=>n(c.lines[it.id])*it.rate));
+    return `<tr><td><b>${esc(sc.name)}</b></td>${M()?`<td class="num">${fm(b)}</td><td class="num">${ib?fm(ib):'<span class="muted">—</span>'}</td>`:''}<td>${bar(weightedProg(its,pm))}</td>${M()?`<td>${bar(b?cl/b:0)}</td>`:''}</tr>`}).join('');
+  return ph(esc(S.settings.contractor)+' · '+esc(S.settings.client),'Dashboard')+(PAY()?apAlert():'')+`<div class="kpis">${tiles}</div>
+  <div class="sec"><div class="sechead"><h2>Progress by scope</h2></div><div class="tw"><table><thead><tr><th>Scope</th>${M()?'<th class="num">Contract budget</th><th class="num">Internal budget</th>':''}<th>Site progress</th>${M()?'<th>Claimed</th>':''}</tr></thead><tbody>${rows}</tbody></table></div></div>
+  <div class="sec"><div class="sechead"><h2>Latest site report</h2></div>${last?`<div class="card"><div class="top"><b>${fd(last.date)} · ${esc(last.by)}</b><span class="pill">${esc(last.weather)} · ${last.manpower} workers</span></div><div>${esc(last.notes)}</div><div class="small muted">${Object.keys(last.progress).length} BOQ items updated</div></div>`:'<div class="empty">No site reports yet.</div>'}</div>`;
+};
+
+/* ---------- 1. CONTRACT BOQ ---------- */
+V.contract=()=>{
+  const E=ed('contract'),pm=progressMap(),m=M();let rows='',gt=0;
+  S.scopes.forEach((sc,i)=>{const its=S.citems.filter(x=>x.scopeId===sc.id);const st=sum(its,camt);gt+=st;
+    rows+=`<tr class="grp"><td class="code">${i+1}</td><td colspan="${m?4:3}">${esc(sc.name)}</td>${m?`<td class="num">${fm(st)}</td>`:''}<td>${bar(weightedProg(its,pm))}</td><td class="act">${E?`<button class="lnk" data-act="addCItem" data-id="${sc.id}">+ Item</button><button class="lnk" data-act="editScope" data-id="${sc.id}">Rename</button><button class="lnk bad" data-act="delScope" data-id="${sc.id}">Delete</button>`:''}</td></tr>`;
+    its.forEach(it=>rows+=`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td>${esc(it.unit)}</td><td class="num">${fq(it.qty)}</td>${m?`<td class="num">${fm(it.rate)}</td><td class="num">${fm(camt(it))}</td>`:''}<td>${bar((pm[it.id]||0)/100)}</td><td class="act">${E?`<button class="lnk" data-act="editCItem" data-id="${it.id}">Edit</button><button class="lnk bad" data-act="delCItem" data-id="${it.id}">Delete</button>`:''}</td></tr>`);
+    if(!its.length)rows+=`<tr><td></td><td colspan="${m?7:5}" class="muted small">No items in this scope yet.</td></tr>`;
+  });
+  if(m)rows+=`<tr class="tot"><td></td><td colspan="4">Contract sum</td><td class="num">${fm(gt)}</td><td>${bar(weightedProg(S.citems,pm))}</td><td></td></tr>`;
+  return ph('Section 1 · Budget of each work','Contract BOQ',E?'<button class="btn pri" data-act="addScope">+ Scope of work</button>':'')+
+  `<div class="tw"><table><thead><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th>${m?'<th class="num">Unit rate</th><th class="num">Amount</th>':''}<th>Site progress</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+};
+
+/* ---------- 2. INTERNAL BOQ ---------- */
+V.internal=()=>{
+  const E=ed('internal'),m=M();if(!scope(ui.iScope))ui.iScope=S.scopes[0]&&S.scopes[0].id;const sc=scope(ui.iScope);
+  const chips=`<div class="chips">${S.scopes.map(s=>{const c=S.sections.filter(x=>x.scopeId===s.id).length;return `<button class="chip ${s.id===ui.iScope?'on':''}" data-act="iScope" data-id="${s.id}">${esc(s.name)}<span class="c">${c}</span></button>`}).join('')}</div>`;
+  if(!sc)return ph('Section 2','Internal BOQ')+'<div class="empty">Add a scope in the Contract BOQ first.</div>';
+  const secs=S.sections.filter(x=>x.scopeId===sc.id);const cb=sum(S.citems.filter(x=>x.scopeId===sc.id),camt);let it=0,rows='';const wq=S.iitems.some(x=>n(x.cpu)>0&&secs.some(s=>s.id===x.sectionId));
+  secs.forEach(sec=>{const its=S.iitems.filter(x=>x.sectionId===sec.id);const st=sum(its,iamt);it+=st;
+    rows+=`<tr class="grp"><td class="code">${secLetter(sec)}</td><td colspan="${(m?4:3)+(wq?1:0)}">Section ${secLetter(sec)} — ${esc(sec.name)}</td>${m?`<td class="num">${fm(st)}</td>`:''}<td></td><td class="act">${E?`<button class="lnk" data-act="addIItem" data-id="${sec.id}">+ Item</button><button class="lnk" data-act="pasteItems" data-id="${sec.id}">+ Paste from BOQ</button><button class="lnk" data-act="editSection" data-id="${sec.id}">Rename</button><button class="lnk bad" data-act="delSection" data-id="${sec.id}">Delete</button>`:''}</td></tr>`;
+    its.forEach(x=>rows+=`<tr><td class="code">${iCode(x)}</td><td>${esc(x.name)}${x.code?`<div class="small muted code">${esc(x.code)}</div>`:''}</td><td>${esc(x.unit)}</td><td class="num">${fq(x.qty)}</td>${wq?`<td class="num">${n(x.cpu)?`${fq(r2(n(x.qty)*n(x.cpu)))} ${esc(x.cu)}<div class="small muted">${fq(x.cpu)} ${esc(x.cu)}/${esc(x.unit)}</div>`:'<span class="muted">—</span>'}</td>`:''}${m?`<td class="num">${fm(x.rate)}${n(x.cpu)?'/'+esc(x.cu):''}</td><td class="num">${fm(iamt(x))}</td>`:''}<td>${x.stock?'<span class="pill info">Stock</span>':'<span class="pill">Not stocked</span>'}</td><td class="act">${E?`<button class="lnk" data-act="editIItem" data-id="${x.id}">Edit</button><button class="lnk bad" data-act="delIItem" data-id="${x.id}">Delete</button>`:''}</td></tr>`);
+    if(!its.length)rows+=`<tr><td></td><td colspan="${(m?7:5)+(wq?1:0)}" class="muted small">No items in this section yet.</td></tr>`;
+  });
+  if(m&&secs.length)rows+=`<tr class="tot"><td></td><td colspan="${4+(wq?1:0)}">Internal total — ${esc(sc.name)}</td><td class="num">${fm(it)}</td><td colspan="2"></td></tr>`;
+  const diff=cb-it;
+  const kp=m?`<div class="kpis"><div class="kpi"><div class="l">Contract budget</div><div class="v">${fm(cb)}</div><div class="s">From Contract BOQ</div></div><div class="kpi"><div class="l">Internal budget</div><div class="v">${fm(it)}</div><div class="s">${secs.length} sections</div></div><div class="kpi"><div class="l">${diff>=0?'Margin':'Over budget'}</div><div class="v" style="color:var(--${diff>=0?'ok':'bad'})">${fm(diff)}</div><div class="s">${cb?fp(diff/cb):'—'} of contract budget</div></div></div>`:'';
+  return ph('Section 2 · Detailed cost by scope','Internal BOQ','<button class="btn" data-act="catOpen">Item catalogue</button>'+(E?`<button class="btn pri" data-act="addSection">+ Section in ${esc(sc.name)}</button>`:''))+`<div class="toolbar">${chips}</div>`+kp+
+  (secs.length?`<div class="tw"><table><thead><tr><th>No.</th><th>Item</th><th>Unit</th><th class="num">Qty</th>${wq?'<th class="num">Priced qty</th>':''}${m?'<th class="num">Unit price</th><th class="num">Amount</th>':''}<th>Stock</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty">No sections for ${esc(sc.name)} yet.${E?' Add Section A to start.':''}</div>`);
+};
+
+/* ---------- 3. SUB-CONTRACTS ---------- */
+V.sub=()=>{
+  const E=ed('sub'),RQ=E||me.role==='SE';let rows='';
+  if(ui.subTab==='ipc')return ph('Section 3 · Labour contracts per scope','Sub-contracts')+subTabs()+vIpc();
+  const T={c:0,q:0,p:0};
+  S.subs.forEach(s=>{const f=subFig(s);T.c+=f.c;T.q+=f.q;T.p+=f.p;const open=ui.subOpen===s.id,sc=scope(s.scopeId);
+    rows+=`<tr><td><b>${esc(sc?sc.name:'—')}</b></td><td>${esc(s.name)}${s.ipcSheetId?` <span class="pill info" title="Figures come from the IPC system">IPC</span>${f.n!=null?`<div class="small muted">${f.n} house${pl(f.n)}${f.wait?` · ${f.wait} claim${pl(f.wait)} waiting approval`:''}</div>`:''}`:''}</td><td class="small">${esc(s.phone)}</td><td class="num">${fm(f.c)}</td><td class="num" style="color:var(--warn)">${fm(f.q)}</td><td class="num">${fm(f.p)}</td><td class="num"><b>${fm(f.c-f.p)}</b></td><td>${bar(f.c?f.p/f.c:0)}</td><td class="act"><button class="lnk" data-act="toggleSub" data-id="${s.id}">${open?'Hide':(s.ipcSheetId?'Claims':'Requests')}</button>${E?`<button class="lnk" data-act="editSub" data-id="${s.id}">Edit</button><button class="lnk bad" data-act="delSub" data-id="${s.id}">Delete</button>`:''}</td></tr>`;
+    if(open)rows+=`<tr><td colspan="9" style="background:var(--thead);padding:12px">${s.ipcSheetId?subIpcDetail(s):subReqDetail(s,RQ)}</td></tr>`});
+  if(S.subs.length)rows+=`<tr class="tot"><td colspan="3">Total</td><td class="num">${fm(T.c)}</td><td class="num">${fm(T.q)}</td><td class="num">${fm(T.p)}</td><td class="num">${fm(T.c-T.p)}</td><td>${bar(T.c?T.p/T.c:0)}</td><td></td></tr>`;
+  return ph('Section 3 · Labour contracts per scope','Sub-contracts',E?'<button class="btn pri" data-act="addSub">+ Sub-contract</button>':'')+subTabs()+
+   (S.subs.length?`<div class="tw"><table><thead><tr><th>Scope</th><th>Sub-contractor</th><th>Phone</th><th class="num">Total contract</th><th class="num">Requesting</th><th class="num">Paid</th><th class="num">Remaining</th><th>Paid %</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No sub-contracts yet.</div>');
+};
+function ipcSubClaims(s){if(!ipcLinked())return null;const cs=IPC.data.contracts.filter(c=>ipcMatch(s,c));const ids={};cs.forEach(c=>ids[c.id]=1);return{contracts:cs,claims:IPC.data.claims.filter(c=>ids[c.contractId])}}
+function subFig(s){
+  if(s.ipcSheetId){const L=ipcSubClaims(s);if(L){const pm=ipcPaidMap(),appr=L.claims.filter(c=>c.status==='approved'),sub=L.claims.filter(c=>c.status==='submitted');const paid=sum(appr,c=>Math.min(n(pm[c.id]),n(c.received)));
+    return{c:sum(L.contracts,c=>c.contractValue)||n(s.amount),q:r2(sum(appr,c=>c.received)-paid+sum(sub,c=>c.received)),p:paid,n:L.contracts.length,wait:sub.length}}return{c:n(s.amount),q:0,p:0}}
+  return{c:n(s.amount),q:sum(s.reqs.filter(r=>r.status==='Requested'),r=>r.amount),p:sum(s.reqs.filter(r=>r.status==='Paid'),r=>r.amount)}}
+function subReqDetail(s,RQ){const rr=s.reqs.map(r=>`<tr><td class="code">#${r.no}</td><td>${fd(r.date)}</td><td>${esc(r.desc)}${r.by?`<div class="small muted">by ${esc(r.by)}</div>`:''}</td><td class="num">${fm(r.amount)}</td><td>${r.status==='Paid'?'<span class="pill ok">Paid</span>':'<span class="pill warn">Requested</span>'}</td><td class="act">${PAY()&&r.status!=='Paid'?`<button class="lnk" data-act="payReq" data-s="${s.id}" data-id="${r.id}">Pay</button>`:''}${RQ&&r.status!=='Paid'?`<button class="lnk bad" data-act="delReq" data-s="${s.id}" data-id="${r.id}">Delete</button>`:''}</td></tr>`).join('');
+  return `<div class="sechead" style="margin-bottom:8px"><b>Payment requests — ${esc(s.name)}</b>${RQ?`<button class="btn sm" data-act="addReq" data-id="${s.id}">+ Payment request</button>`:''}</div>${s.reqs.length?`<div class="tw"><table><thead><tr><th>Req.</th><th>Date</th><th>Description</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead><tbody>${rr}</tbody></table></div>`:'<div class="empty">No payment requests yet.</div>'}`}
+function subIpcDetail(s){const L=ipcSubClaims(s);
+  if(!L)return IPC.err?`<div class="small" style="color:var(--bad)">${esc(IPC.err)}</div>`:'<div class="empty">Loading from the IPC system…</div>';
+  const pm=ipcPaidMap(),byC={};L.contracts.forEach(c=>byC[c.id]=c);const cl=[...L.claims].sort((a,b)=>a.date<b.date?1:-1);
+  return `<div class="sechead" style="margin-bottom:8px"><b>IPC claims — ${esc(s.name)}</b><span class="small muted">Requested and approved in the IPC system · Finance pays in Payables</span></div>${cl.length?`<div class="tw"><table><thead><tr><th>IPC no.</th><th>Location</th><th>Date</th><th>Status</th><th class="num">This claim</th><th class="num">Retention</th><th class="num">Net</th><th class="num">Paid</th></tr></thead><tbody>${cl.map(c=>`<tr><td class="code">${esc(c.ipcNo)}</td><td class="small">${esc(byC[c.contractId]?.location||'')}</td><td>${fd(c.date)}</td><td><span class="pill ${IPC_CL[c.status]||''}">${esc(c.status)}</span></td><td class="num">${fm(c.current)}</td><td class="num">${fm(-c.retention)}</td><td class="num">${fm(c.received)}</td><td class="num">${n(pm[c.id])?fm(pm[c.id]):'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No claims in the IPC system yet.</div>'}`}
+
+/* ---------- 4. PROGRESS CLAIM (IPC) ---------- */
+V.claim=()=>{
+  const E=ed('claim'),m=M();const cs=[...S.claims].sort((a,b)=>a.no-b.no);
+  if(!cs.find(c=>c.id===ui.claimId))ui.claimId=cs.length?cs[cs.length-1].id:null;
+  const c=S.claims.find(x=>x.id===ui.claimId);const hasDraft=S.claims.some(x=>x.status==='Draft');
+  const chips=`<div class="chips">${cs.map(x=>`<button class="chip ${x.id===ui.claimId?'on':''}" data-act="pickClaim" data-id="${x.id}">${ipcNo(x)}<span class="c">${x.status}</span></button>`).join('')}</div>`;
+  const acts=E?`<button class="btn pri" data-act="newClaim" ${hasDraft?'disabled title="Approve or delete the current draft first"':''}>+ New claim</button>`:'';
+  if(!c)return ph('Section 4 · IPC breakdown against Contract BOQ','Progress Claim',acts)+'<div class="empty">No claims yet.</div>';
+  const R=claimRows(c),pm=progressMap(),edit=E&&c.status==='Draft';
+  const pill={Draft:'warn',Submitted:'info',Approved:'ok'}[c.status];
+  let rows='',T={ca:0,pa:0,ua:0,cua:0};
+  S.scopes.forEach((sc,i)=>{const its=S.citems.filter(x=>x.scopeId===sc.id);if(!its.length)return;
+    const s={ca:sum(its,camt),pa:sum(its,x=>R[x.id].prev*x.rate),ua:sum(its,x=>R[x.id].cur*x.rate),cua:sum(its,x=>R[x.id].cum*x.rate)};Object.keys(T).forEach(k=>T[k]+=s[k]);
+    rows+=`<tr class="grp"><td class="code">${i+1}</td><td colspan="${m?2:3}">${esc(sc.name)}</td>${m?`<td></td><td></td><td class="num">${fm(s.ca)}</td><td class="bl"></td><td class="num">${fm(s.pa)}</td><td class="bl"></td><td class="num" id="sg_ua_${sc.id}">${fm(s.ua)}</td><td class="bl"></td><td class="num" id="sg_cua_${sc.id}">${fm(s.cua)}</td><td class="num" id="sg_p_${sc.id}">${fp(s.ca?s.cua/s.ca:0)}</td>`:'<td class="bl"></td><td class="bl"></td><td class="bl"></td><td></td>'}<td class="bl"></td></tr>`;
+    its.forEach(it=>{const r=R[it.id];const over=r.cum>n(it.qty)+1e-9;
+      const cur=edit?`<input class="qin ${over?'over':''}" id="cq_${it.id}" data-cq="${it.id}" type="number" step="any" min="0" value="${r.cur||''}" placeholder="0" aria-label="Current qty ${esc(it.desc)}">`:fq(r.cur);
+      rows+=`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td>${esc(it.unit)}</td><td class="num">${fq(it.qty)}</td>${m?`<td class="num">${fm(it.rate)}</td><td class="num">${fm(camt(it))}</td>`:''}<td class="num bl">${fq(r.prev)}</td>${m?`<td class="num">${fm(r.prev*it.rate)}</td>`:''}<td class="num bl">${cur}</td>${m?`<td class="num" id="ua_${it.id}">${fm(r.cur*it.rate)}</td>`:''}<td class="num bl" id="cu_${it.id}">${fq(r.cum)}</td>${m?`<td class="num" id="cua_${it.id}">${fm(r.cum*it.rate)}</td>`:''}<td class="num" id="cp_${it.id}" style="${over?'color:var(--bad)':''}">${fp(n(it.qty)?r.cum/it.qty:0)}</td><td class="num bl muted">${fq(pm[it.id]||0)}%</td></tr>`});
+  });
+  if(m)rows+=`<tr class="tot"><td></td><td colspan="4">Total</td><td class="num">${fm(T.ca)}</td><td class="bl"></td><td class="num">${fm(T.pa)}</td><td class="bl"></td><td class="num" id="t_ua">${fm(T.ua)}</td><td class="bl"></td><td class="num" id="t_cua">${fm(T.cua)}</td><td class="num" id="t_p">${fp(T.ca?T.cua/T.ca:0)}</td><td class="bl"></td></tr>`;
+  const head=m?`<tr><th colspan="3"></th><th colspan="3" class="grpth">Contract</th><th colspan="2" class="grpth">Previous</th><th colspan="2" class="grpth">This claim</th><th colspan="3" class="grpth">Cumulative</th><th class="grpth">Site</th></tr><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th><th class="num bl">Qty</th><th class="num">Amount</th><th class="num bl">Qty</th><th class="num">Amount</th><th class="num bl">Qty</th><th class="num">Amount</th><th class="num">%</th><th class="num bl">%</th></tr>`
+    :`<tr><th colspan="3"></th><th class="grpth">Contract</th><th class="grpth">Previous</th><th class="grpth">This claim</th><th colspan="2" class="grpth">Cumulative</th><th class="grpth">Site</th></tr><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th><th class="num bl">Qty</th><th class="num bl">Qty</th><th class="num bl">Qty</th><th class="num">%</th><th class="num bl">%</th></tr>`;
+  const next={Draft:'Submitted',Submitted:'Approved'}[c.status];const inv=invOfClaim(c.id);
+  const cacts=E?`${edit?'<button class="btn" data-act="fillClaim">Fill from site progress</button>':''}${next?`<button class="btn" data-act="claimStatus" data-s="${next}">Mark ${next.toLowerCase()}</button>`:''}${c.status!=='Draft'&&!inv&&c.id===cs[cs.length-1].id?'<button class="btn" data-act="claimStatus" data-s="Draft">Reopen as draft</button>':''}${!inv&&c.id===cs[cs.length-1].id?'<button class="btn danger" data-act="delClaim">Delete</button>':''}`:'';
+  return ph('Section 4 · IPC breakdown against Contract BOQ','Progress Claim',acts)+`<div class="toolbar">${chips}</div>
+  <div class="ipc-head"><div><div class="l">Project</div><div class="v">${esc(S.settings.project)}</div></div><div><div class="l">Claim no.</div><div class="v">${ipcNo(c)}</div></div><div><div class="l">Valuation date</div><div class="v">${fd(c.date)}</div></div><div><div class="l">Status</div><div class="v"><span class="pill ${pill}">${c.status}</span></div></div>${m?`<div><div class="l">Invoice</div><div class="v">${inv?`${invNo(inv)} <span class="pill ${invPay(inv).tag[1]}">${invPay(inv).tag[0]}</span>`:'<span class="muted">Not invoiced</span>'}</div></div>`:''}</div>
+  <div class="toolbar" style="justify-content:space-between"><span class="small muted">${edit?'Type the quantity done this period in “This claim”. Previous = sum of earlier claims.':'This claim is locked. Reopen the latest claim as a draft to change it.'}</span><div class="acts">${cacts}</div></div>
+  <div class="tw"><table><thead>${head}</thead><tbody>${rows}</tbody></table></div>
+  ${m?`<div class="sec"><div id="summ">${claimSummary(c)}</div></div>`:''}
+  <div class="sign"><div><b>Prepared by</b>Quantity Surveyor<br>Date:</div><div><b>Checked by</b>Project Manager<br>Date:</div><div><b>Approved by</b>${esc(S.settings.client)}<br>Date:</div></div>`;
+};
+function claimSummary(c){const{cum,prev,cur,rp,ret}=claimNet(c);
+  const row=(l,v,cls='')=>`<div class="${cls}">${l}</div><div class="num ${cls}">${v}</div>`;
+  return `<div class="summ">${row('A. Cumulative work done to date',fm(cum))}${row('B. Less previous claims',fm(-prev))}${row('C. Work done this period (A − B)',fm(cur))}${row(`D. Less retention ${n(S.settings.retention)}% of C`,fm(-ret))}${row('E. Cumulative retention held',fm(cum*rp))}${row('Net amount due this claim (C − D)',fm(cur-ret),'net')}</div>`}
+function updClaimRow(id){const c=S.claims.find(x=>x.id===ui.claimId);const it=citem(id);const R=claimRows(c);const r=R[id];const m=M();const over=r.cum>n(it.qty)+1e-9;
+  const set=(k,v)=>{const el=document.getElementById(k);if(el)el.textContent=v};
+  set('cu_'+id,fq(r.cum));const cp=document.getElementById('cp_'+id);if(cp){cp.textContent=fp(n(it.qty)?r.cum/it.qty:0);cp.style.color=over?'var(--bad)':''}
+  const inp=document.getElementById('cq_'+id);if(inp)inp.classList.toggle('over',over);
+  if(!m)return;set('ua_'+id,fm(r.cur*it.rate));set('cua_'+id,fm(r.cum*it.rate));
+  const its=S.citems.filter(x=>x.scopeId===it.scopeId);const ca=sum(its,camt),cua=sum(its,x=>R[x.id].cum*x.rate);
+  set('sg_ua_'+it.scopeId,fm(sum(its,x=>R[x.id].cur*x.rate)));set('sg_cua_'+it.scopeId,fm(cua));set('sg_p_'+it.scopeId,fp(ca?cua/ca:0));
+  const TA=sum(S.citems,camt),TC=sum(S.citems,x=>R[x.id].cum*x.rate);set('t_ua',fm(sum(S.citems,x=>R[x.id].cur*x.rate)));set('t_cua',fm(TC));set('t_p',fp(TA?TC/TA:0));
+  const sm=$('#summ');if(sm)sm.innerHTML=claimSummary(c)}
+
+/* ---------- 5. STOCK ---------- */
+V.stock=()=>{
+  const E=ed('stock');const q=ui.stQ.toLowerCase();
+  const mine=S.prs.filter(p=>p.source==='Stock'),aw=AWAIT();
+  const stTabs=`<div class="toolbar"><div class="chips"><button class="chip ${ui.stTab==='stock'?'on':''}" data-act="setF" data-key="stTab" data-id="stock">Stock balance</button><button class="chip ${ui.stTab==='req'?'on':''}" data-act="setF" data-key="stTab" data-id="req">Issued requests${aw.length?`<span class="bd2">${aw.length} to receive</span>`:''}</button></div></div>`;
+  if(ui.stTab==='req')return ph('Section 5 · Stock against Internal BOQ','Stock',E?'<button class="btn pri" data-act="newPR" data-src="Stock">+ Purchase request</button>':'')+stTabs+recvSection(aw,E)+'<p class="small muted" style="margin:0 0 10px">Requests sent from Stock to Procurement, with their purchase order and delivery status.</p>'+prTable([...mine].sort((a,b)=>b.no-a.no),false);
+  const items=S.iitems.filter(i=>i.stock).filter(i=>ui.stScope==='all'||iScopeId(i)===ui.stScope).filter(i=>!q||i.name.toLowerCase().includes(q));
+  const scs=S.scopes.filter(s=>S.iitems.some(i=>i.stock&&iScopeId(i)===s.id));
+  let need=0;
+  const rows=items.map(i=>{const s=stockOf(i.id);const[st,cl]=stockStatus(s);if(s.toBuy>0)need++;const sc=scope(iScopeId(i));
+    return `<tr>${E?`<td><input type="checkbox" data-sel="${i.id}" ${ui.sel.has(i.id)?'checked':''} aria-label="Select ${esc(i.name)}"></td>`:''}<td class="code">${iCode(i)}</td><td>${esc(i.name)}<div class="small muted">${i.code?esc(i.code)+' · ':''}${esc(sc?sc.name:'')}</div></td><td>${esc(i.unit)}</td><td class="num">${fq(s.boq)}</td><td class="num">${fq(s.rec)}</td><td class="num">${fq(s.iss)}</td><td class="num"><b>${fq(s.onHand)}</b>${n(i.cpu)?`<div class="small muted">${fq(r2(s.onHand*i.cpu))} ${esc(i.cu)}</div>`:''}</td><td class="num">${s.pend?fq(s.pend):'<span class="muted">—</span>'}</td><td class="num" style="${s.toBuy>0?'color:var(--warn);font-weight:600':''}">${s.toBuy?fq(s.toBuy):'<span class="muted">—</span>'}</td><td><span class="pill ${cl}">${st}</span></td><td class="act">${E?`<button class="lnk" data-act="stMove" data-t="IN" data-id="${i.id}">Receive</button><button class="lnk" data-act="stMove" data-t="OUT" data-id="${i.id}">Issue</button><button class="lnk" data-act="stMove" data-t="ADJ" data-id="${i.id}">Count</button>`:''}</td></tr>`}).join('');
+  const chips=`<div class="chips"><button class="chip ${ui.stScope==='all'?'on':''}" data-act="stScope" data-id="all">All scopes</button>${scs.map(s=>`<button class="chip ${ui.stScope===s.id?'on':''}" data-act="stScope" data-id="${s.id}">${esc(s.name)}</button>`).join('')}</div>`;
+  const log=[...S.moves].sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0).slice(0,15).map(mv=>{const it=iitem(mv.itemId);return `<tr><td>${fd(mv.date)}</td><td><span class="pill ${mv.type==='IN'?'ok':mv.type==='OUT'?'warn':'info'}">${{IN:'Received',OUT:'Issued',ADJ:'Count adj.'}[mv.type]}</span></td><td>${esc(it?it.name:'(deleted item)')}</td><td class="num">${mv.qty>0&&mv.type==='ADJ'?'+':''}${fq(mv.qty)} ${esc(it?it.unit:'')}</td><td class="small">${esc(mv.ref)}</td><td class="small muted">${esc(mv.by)}</td><td class="act">${E&&!/^PO-/.test(mv.ref||'')?`<button class="lnk bad" data-act="delMove" data-id="${mv.id}">Delete</button>`:''}</td></tr>`}).join('');
+  return ph('Section 5 · Stock against Internal BOQ','Stock',E?`<button class="btn pri" data-act="newPR" data-src="Stock" ${ui.sel.size?'':'disabled'}>Purchase request${ui.sel.size?' ('+ui.sel.size+')':''}</button>`:'')+stTabs+(aw.length?`<div class="alert warn" role="status"><b>${aw.length} deliver${aw.length===1?'y':'ies'} waiting for you to receive</b><div class="small">Open <b>Issued requests</b> to check the goods and receive them. They count as on hand only after you receive them.</div></div>`:'')+
+  `<div class="toolbar">${chips}<input class="in search" id="stq" placeholder="Search items" value="${esc(ui.stQ)}" aria-label="Search stock items"></div>
+  <div class="small muted" style="margin-bottom:8px">${items.length} stock items · <b style="color:var(--warn)">${need}</b> need purchasing. To buy = BOQ qty − received − already on order.${E?' Tick items and press Purchase request.':''}</div>
+  ${items.length?`<div class="tw"><table><thead><tr>${E?'<th></th>':''}<th>No.</th><th>Item</th><th>Unit</th><th class="num">BOQ qty</th><th class="num">Received</th><th class="num">Issued</th><th class="num">On hand</th><th class="num">On order</th><th class="num">To buy</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No stock items match.</div>'}
+  <div class="sec"><h2>Recent stock movements</h2>${log?`<div class="tw"><table class="ledger"><thead><tr><th>Date</th><th>Type</th><th>Item</th><th class="num">Qty</th><th>Reference</th><th>By</th><th></th></tr></thead><tbody>${log}</tbody></table></div>`:'<div class="empty">No movements yet.</div>'}</div>`;
+};
+
+/* ---------- 6. PROCUREMENT ---------- */
+const PR_LABEL={Pending:'New request',Received:'Accepted','Part ordered':'Part ordered',Ordered:'PO issued',Cancelled:'Cancelled'};
+const PR_CL={Pending:'warn',Received:'info','Part ordered':'info',Ordered:'ok',Cancelled:''};
+const PO_LABEL={Issued:'PO issued','Being delivered':'Being delivered',Delivered:'Delivered · awaiting stock',Received:'Received in stock',Cancelled:'Cancelled'};
+const PO_CL={Issued:'info','Being delivered':'warn',Delivered:'warn',Received:'ok',Cancelled:''};
+const PO_NEXT={Issued:'Being delivered','Being delivered':'Delivered'};
+const PO_BTN={Issued:'Mark being delivered','Being delivered':'Mark delivered'};
+const prTotal=p=>sum(p.items,lineAmt);
+const prPOs=p=>[...new Set(p.items.map(i=>i.poId).filter(Boolean))].map(po).filter(Boolean);
+function prDelivery(p){const os=prPOs(p);if(!os.length)return '<span class="muted small">—</span>';return os.map(o=>`<div class="small"><b class="code">${poNo(o)}</b> <span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span></div>`).join('')}
+function itemsBrief(items){return items.slice(0,2).map(i=>{const it=iitem(i.itemId);return esc(it?it.name:'?')+' × '+fq(i.qty)}).join('<br>')+(items.length>2?`<br><span class="muted">+${items.length-2} more</span>`:'')}
+function prTable(list,proc){const m=M(),E=proc&&ed('proc');
+  if(!list.length)return '<div class="empty">No purchase requests here.</div>';
+  return `<div class="tw"><table><thead><tr><th>PR no.</th><th>Date</th><th>Need by</th>${proc?'<th>From</th>':''}<th>Items</th>${m?'<th class="num">Est. amount</th>':''}<th>Status</th><th>Purchase order</th><th></th></tr></thead><tbody>${list.map(p=>`<tr><td class="code"><b>${prNo(p)}</b></td><td>${fd(p.date)}</td><td>${fd(p.needBy)}</td>${proc?`<td>${p.source}<div class="small muted">${esc(p.by)}</div></td>`:''}<td class="small">${itemsBrief(p.items)}</td>${m?`<td class="num">${fm(prTotal(p))}</td>`:''}<td><span class="pill ${PR_CL[p.status]||''}">${PR_LABEL[p.status]||esc(p.status)}</span></td><td>${prDelivery(p)}</td><td class="act"><button class="lnk" data-act="prOpen" data-id="${p.id}">Open</button>${E&&p.status==='Pending'?`<button class="lnk" data-act="prAccept" data-id="${p.id}">Accept</button>`:''}${E&&['Received','Part ordered'].includes(p.status)?`<button class="lnk" data-act="poNew" data-id="${p.id}">Create PO</button>`:''}</td></tr>`).join('')}</tbody></table></div>`}
+function poTable(list){const m=M(),E=ed('proc');
+  if(!list.length)return '<div class="empty">No purchase orders here.</div>';
+  return `<div class="tw"><table><thead><tr><th>PO no.</th><th>Date</th><th>Supplier</th><th>From PR</th><th>Items</th>${m?'<th class="num">Amount</th>':''}<th>Delivery</th><th>Credit term</th>${m?'<th>Payment</th>':''}<th></th></tr></thead><tbody>${list.map(o=>{const sp=supplier(o.supplierId),pr=S.prs.find(x=>x.id===o.prId),pp=poPay(o);
+   return `<tr><td class="code"><b>${poNo(o)}</b></td><td>${fd(o.date)}</td><td>${esc(sp?sp.name:'—')}</td><td class="code">${pr?prNo(pr):'—'}</td><td class="small">${itemsBrief(o.items)}</td>${m?`<td class="num">${fm(pp.amt)}</td>`:''}<td><span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span>${o.deliveredDate?`<div class="small muted">${fd(o.deliveredDate)}</div>`:''}</td><td class="small">${termLabel(o.creditDays)}</td>${m?`<td><span class="pill ${pp.tag[1]}">${pp.tag[0]}</span></td>`:''}<td class="act"><button class="lnk" data-act="poOpen" data-id="${o.id}">Open</button>${E&&PO_NEXT[o.status]?`<button class="lnk" data-act="poAdvance" data-id="${o.id}">${PO_BTN[o.status]}</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`}
+const fchips=(F,list,key,pred)=>`<div class="chips">${F.map(([k,l])=>`<button class="chip ${ui[key]===k?'on':''}" data-act="setF" data-key="${key}" data-id="${k}">${l}<span class="c">${list.filter(x=>pred(x,k)).length}</span></button>`).join('')}</div>`;
+V.proc=()=>{
+  const E=ed('proc'),m=M();
+  const tab=(k,l,c)=>`<button class="chip ${ui.procTab===k?'on':''}" data-act="procTab" data-id="${k}">${l}<span class="c">${c}</span></button>`;
+  const head=ph('Section 6 · Purchasing and suppliers','Procurement',ui.procTab==='sup'&&E?'<button class="btn pri" data-act="addSupplier">+ Supplier</button>':'')+
+    `<div class="toolbar"><div class="chips">${tab('req','Received requests',S.prs.filter(PR_OPEN).length)}${tab('po','Purchase orders',S.pos.filter(PO_OPEN).length)}${tab('sup','Suppliers',S.suppliers.length)}</div></div>`;
+  if(ui.procTab==='sup'){
+    const rows=S.suppliers.map(s=>{const os=S.pos.filter(o=>o.supplierId===s.id);const bal=sum(os.filter(o=>o.status!=='Cancelled'),o=>poPay(o).bal);
+      return `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.contact)}</td><td>${esc(s.phone)}</td><td>${termLabel(s.days)}</td><td class="small">${esc(s.category)}</td><td class="num">${os.filter(PO_OPEN).length}</td>${m?`<td class="num">${bal>0.004?fm(bal):'<span class="muted">—</span>'}</td>`:''}<td class="act">${E?`<button class="lnk" data-act="editSupplier" data-id="${s.id}">Edit</button><button class="lnk bad" data-act="delSupplier" data-id="${s.id}">Delete</button>`:''}</td></tr>`}).join('');
+    return head+(S.suppliers.length?`<div class="tw"><table><thead><tr><th>Supplier</th><th>Contact</th><th>Phone</th><th>Credit term</th><th>Supplies</th><th class="num">Open POs</th>${m?'<th class="num">Unpaid</th>':''}<th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No suppliers yet.</div>');
+  }
+  if(ui.procTab==='po'){
+    const pred=(o,k)=>k==='all'||(k==='open'?PO_OPEN(o):o.status===k);
+    const F=[['open','Open'],['Issued','Issued'],['Being delivered','Being delivered'],['Delivered','Awaiting stock'],['Received','Received'],['Cancelled','Cancelled'],['all','All']];
+    return head+`<div class="toolbar">${fchips(F,S.pos,'poF',pred)}</div><p class="small muted" style="margin:0 0 10px">Every PO is visible to Finance. Delivered POs become supplier payments in Payables, due by the supplier's credit term.</p>`+poTable([...S.pos].sort((a,b)=>b.no-a.no).filter(o=>pred(o,ui.poF)));
+  }
+  const pred=(p,k)=>k==='all'||(k==='open'?PR_OPEN(p):p.status===k);
+  const F=[['open','To process'],['Pending','New'],['Received','Accepted'],['Part ordered','Part ordered'],['Ordered','PO issued'],['Cancelled','Cancelled'],['all','All']];
+  return head+`<div class="toolbar">${fchips(F,S.prs,'procF',pred)}</div>`+prTable([...S.prs].sort((a,b)=>b.no-a.no).filter(p=>pred(p,ui.procF)),true);
+};
+
+/* ---------- 7. SITE TEAM ---------- */
+V.site=()=>{
+  const E=ed('site');
+  const tabs=`<div class="chips"><button class="chip ${ui.siteTab==='rep'?'on':''}" data-act="siteTab" data-id="rep">Site reports<span class="c">${S.reports.length}</span></button><button class="chip ${ui.siteTab==='pr'?'on':''}" data-act="siteTab" data-id="pr">Purchase requests<span class="c">${S.prs.filter(p=>p.source==='Site').length}</span></button></div>`;
+  if(ui.siteTab==='pr')return ph('Section 7 · Site reporting and requests','Site Team',E?'<button class="btn pri" data-act="newPR" data-src="Site">+ Purchase request</button>':'')+`<div class="toolbar">${tabs}</div>`+prTable([...S.prs].filter(p=>p.source==='Site').sort((a,b)=>b.no-a.no),false);
+  const pm=progressMap();
+  const cards=[...S.reports].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<div class="card"><div class="top"><b>${fd(r.date)}</b><span class="pill">${esc(r.weather)} · ${r.manpower} workers</span></div><div class="small muted">By ${esc(r.by)} · ${Object.keys(r.progress).length} items updated</div><div>${esc(r.notes)||'<span class="muted">No notes</span>'}</div><div class="acts"><button class="lnk" data-act="viewReport" data-id="${r.id}">View progress</button>${E?`<button class="lnk bad" data-act="delReport" data-id="${r.id}">Delete</button>`:''}</div></div>`).join('');
+  const sum_=S.scopes.map(sc=>`<tr><td><b>${esc(sc.name)}</b></td><td>${bar(weightedProg(S.citems.filter(x=>x.scopeId===sc.id),pm))}</td></tr>`).join('');
+  return ph('Section 7 · Site reporting and requests','Site Team',E?'<button class="btn pri" data-act="newReport">+ Site report</button>':'')+`<div class="toolbar">${tabs}</div>
+  <div class="split"><div class="sec" style="margin-top:0"><h2>Current progress</h2><div class="tw"><table><tbody>${sum_}<tr class="tot"><td>Overall</td><td>${bar(weightedProg(S.citems,pm))}</td></tr></tbody></table></div></div>
+  <div class="sec" style="margin-top:0"><h2>Reports</h2>${cards||'<div class="empty">No site reports yet.</div>'}</div></div>`;
+};
+function reportModal(){
+  const pm=progressMap();let rows='';
+  S.scopes.forEach(sc=>{const its=S.citems.filter(x=>x.scopeId===sc.id);if(!its.length)return;rows+=`<tr class="grp"><td colspan="4">${esc(sc.name)}</td></tr>`;
+    its.forEach(it=>rows+=`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td class="num muted">${fq(pm[it.id]||0)}%</td><td class="num"><input class="qin" id="rp_${it.id}" type="number" min="0" max="100" step="any" value="${pm[it.id]??''}" placeholder="0" aria-label="New percent ${esc(it.desc)}"></td></tr>`)});
+  modal(`<h3>New site report</h3><form id="rf" class="fgrid">
+   ${field({k:'date',l:'Date',t:'date',v:today()})}${field({k:'weather',l:'Weather',t:'select',o:['Sunny','Cloudy','Rain','Heavy rain'].map(x=>[x,x]),v:'Sunny'})}
+   ${field({k:'manpower',l:'Workers on site',t:'number',v:''})}${field({k:'by',l:'Reported by',v:me.name})}
+   ${field({k:'notes',l:'Work done, issues, remarks',t:'textarea',full:true})}
+   <div class="full"><div class="eyebrow" style="margin-bottom:6px">Percent complete by Contract BOQ item — change only what moved</div><div class="tw" style="max-height:46vh;overflow:auto"><table><thead><tr><th>No.</th><th>Item</th><th class="num">Last</th><th class="num">Now %</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+   <div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Submit report</button></div></form>`,true);
+  $('#rf').onsubmit=e=>{e.preventDefault();const prog={};let bad=false;
+    S.citems.forEach(it=>{const el=$('#rp_'+it.id);if(!el||el.value==='')return;const v=n(el.value);if(v<0||v>100)bad=true;if(v!==(pm[it.id]??-1))prog[it.id]=v});
+    if(bad){toast('Percent must be between 0 and 100','bad');return}
+    const notes=$('#f_notes').value.trim();if(!Object.keys(prog).length&&!notes){toast('Enter progress or notes before submitting','bad');return}
+    S.reports.push({id:uid(),date:$('#f_date').value||today(),by:$('#f_by').value.trim()||me.name,weather:$('#f_weather').value,manpower:n($('#f_manpower').value),notes,progress:prog});
+    save();closeModal();render();toast('Site report submitted')}}
+
+/* ---------- PURCHASE REQUEST MODAL (Stock + Site) ---------- */
+let prCtx=null;
+function prModal(source,prefill={}){
+  const scs=S.scopes.filter(s=>S.iitems.some(i=>i.stock&&iScopeId(i)===s.id));
+  const first=Object.keys(prefill)[0];
+  prCtx={source,tmp:{...prefill},sc:first?iScopeId(iitem(first)):(scs[0]&&scs[0].id)};
+  modal(`<h3>New purchase request</h3><form id="prmf" class="fgrid">${field({k:'needBy',l:'Needed on site by',t:'date',v:''})}${field({k:'by',l:'Requested by',v:me.name})}${field({k:'note',l:'Purpose / note',t:'textarea',full:true})}
+   <div class="full" id="prbody"></div><div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Send to procurement</button></div></form>`,true);
+  prBody();
+  $('#prmf').onsubmit=e=>{e.preventDefault();const items=Object.entries(prCtx.tmp).filter(([,q])=>n(q)>0).map(([itemId,qty])=>({itemId,qty:n(qty),price:n(iitem(itemId).rate),cpu:n(iitem(itemId).cpu),cu:iitem(itemId).cu||''}));
+    if(!items.length){toast('Enter a quantity for at least one item','bad');return}
+    const over=items.map(i=>({i,it:iitem(i.itemId),s:stockOf(i.itemId)})).filter(x=>x.i.qty>x.s.toBuy+1e-9);
+    if(over.length){toast('More than the Internal BOQ allows — '+over.map(x=>`${x.it.name}: only ${fq(x.s.toBuy)} ${x.it.unit} left to order`).join(' · '),'bad');return}
+    const p={id:uid(),no:Math.max(0,...S.prs.map(x=>n(x.no)))+1,date:today(),needBy:$('#f_needBy').value,source:prCtx.source,by:$('#f_by').value.trim()||me.name,items,status:'Pending',supplierId:'',note:$('#f_note').value.trim(),hist:[]};
+    S.prs.push(p);if(prCtx.source==='Stock'){ui.sel.clear();ui.stTab='req'}save();closeModal();render();toast(prNo(p)+' sent to procurement')}}
+function prBody(){
+  const scs=S.scopes.filter(s=>S.iitems.some(i=>i.stock&&iScopeId(i)===s.id));const cnt=Object.values(prCtx.tmp).filter(q=>n(q)>0).length;
+  const its=S.iitems.filter(i=>i.stock&&iScopeId(i)===prCtx.sc);
+  $('#prbody').innerHTML=`<div class="sechead" style="margin-bottom:8px"><div class="chips">${scs.map(s=>`<button type="button" class="chip ${s.id===prCtx.sc?'on':''}" data-act="prScope" data-id="${s.id}">${esc(s.name)}</button>`).join('')}</div><span class="pill info" id="prcnt">${cnt} item${cnt===1?'':'s'} in request</span></div>
+  <div class="tw" style="max-height:44vh;overflow:auto"><table><thead><tr><th>No.</th><th>Internal BOQ item</th><th>Unit</th><th class="num">BOQ qty</th><th class="num">On hand</th><th class="num">Left to order</th><th class="num">Request qty</th></tr></thead><tbody>${its.map(i=>{const s=stockOf(i.id);return `<tr><td class="code">${iCode(i)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td class="num">${fq(s.boq)}</td><td class="num">${fq(s.onHand)}</td><td class="num">${fq(s.toBuy)}</td><td class="num"><input class="qin ${n(prCtx.tmp[i.id])>s.toBuy+1e-9?'over':''}" data-pq="${i.id}" type="number" min="0" step="any" value="${prCtx.tmp[i.id]||''}" placeholder="0" aria-label="Request qty ${esc(i.name)}"></td></tr>`}).join('')}</tbody></table></div>`}
+
+function prDetail(id){
+  const p=S.prs.find(x=>x.id===id),E=ed('proc'),m=M();
+  const rows=p.items.map(i=>{const it=iitem(i.itemId),o=i.poId&&po(i.poId);return `<tr><td class="code">${it?iCode(it):''}</td><td>${esc(it?it.name:'(deleted)')}</td><td>${esc(it?it.unit:'')}</td><td class="num">${fq(i.qty)}</td>${m?`<td class="num">${fm(i.price)}${n(i.cpu)?'/'+esc(i.cu):''}</td><td class="num">${fm(lineAmt(i))}</td>`:''}<td>${o?`<b class="code">${poNo(o)}</b> <span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span>`:'<span class="muted small">Not ordered yet</span>'}</td></tr>`}).join('');
+  modal(`<h3>${prNo(p)} <span class="pill ${PR_CL[p.status]||''}" style="vertical-align:middle">${PR_LABEL[p.status]||esc(p.status)}</span></h3>
+  <div class="ipc-head"><div><div class="l">Requested</div><div class="v">${fd(p.date)}</div></div><div><div class="l">Need by</div><div class="v">${fd(p.needBy)}</div></div><div><div class="l">From</div><div class="v">${p.source} · ${esc(p.by)}</div></div></div>
+  ${p.note?`<p class="small">${esc(p.note)}</p>`:''}
+  <div class="tw"><table><thead><tr><th>No.</th><th>Item</th><th>Unit</th><th class="num">Qty</th>${m?'<th class="num">Est. price</th><th class="num">Amount</th>':''}<th>Purchase order</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="mact">${E&&['Pending','Received'].includes(p.status)?`<button class="btn danger" data-act="prCancel" data-id="${p.id}">Cancel request</button>`:''}<button class="btn" data-act="close">Close</button>${E&&p.status==='Pending'?`<button class="btn" data-act="prAccept" data-id="${p.id}">Accept request</button>`:''}${E&&['Received','Part ordered'].includes(p.status)?`<button class="btn pri" data-act="poNew" data-id="${p.id}">Create purchase order</button>`:''}</div>`,true)}
+
+function poNewModal(prId){
+  const p=S.prs.find(x=>x.id===prId);const open=p.items.map((i,k)=>({i,k})).filter(x=>!x.i.poId);
+  if(!S.suppliers.length){toast('Add a supplier first (Procurement → Suppliers)','bad');return}
+  const price=i=>n(i.price)||n(iitem(i.itemId)?.rate);
+  const rows=open.map(({i,k})=>{const it=iitem(i.itemId);return `<tr><td><input type="checkbox" id="pk_${k}" checked aria-label="Include ${esc(it?it.name:'item')}"></td><td>${esc(it?it.name:'?')}</td><td>${esc(it?it.unit:'')}</td><td class="num"><input class="qin" id="pq_${k}" type="number" step="any" min="0" value="${i.qty}" aria-label="Qty"></td><td class="num"><input class="qin" id="pu_${k}" type="number" step="any" min="0" value="${price(i)}" aria-label="Unit price">${n(i.cpu)?`<div class="small muted">per ${esc(i.cu)} · ${fq(i.cpu)} ${esc(i.cu)}/pcs</div>`:''}</td><td class="num" id="pa_${k}"></td></tr>`}).join('');
+  const def=S.suppliers.find(s=>s.id===p.supplierId)||S.suppliers[0];
+  modal(`<h3>Purchase order from ${prNo(p)}</h3><form id="pof" class="fgrid">${field({k:'sup',l:'Supplier',t:'select',o:S.suppliers.map(s=>[s.id,s.name+' · '+termLabel(s.days)]),v:def.id,full:true})}${field({k:'date',l:'PO date',t:'date',v:today()})}${field({k:'expected',l:'Expected delivery',t:'date',v:p.needBy||''})}
+   <div class="full tw"><table><thead><tr><th></th><th>Item</th><th>Unit</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead><tbody>${rows}<tr class="tot"><td colspan="5">PO total</td><td class="num" id="potot"></td></tr></tbody></table></div>
+   ${field({k:'note',l:'Note to supplier / Finance',t:'textarea',full:true})}
+   <p class="hint full">Untick items to order them from another supplier later. Finance sees this PO straight away; payment falls due by the supplier's credit term after delivery.</p>
+   <div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Issue purchase order</button></div></form>`,true);
+  const calc=()=>{let t=0;open.forEach(({k})=>{const a=n($('#pq_'+k).value)*(n(open.find(x=>x.k===k).i.cpu)||1)*n($('#pu_'+k).value);$('#pa_'+k).textContent=fm(a);if($('#pk_'+k).checked)t+=a});$('#potot').textContent=fm(t)};
+  $('#pof').addEventListener('input',calc);$('#pof').addEventListener('change',calc);calc();
+  $('#pof').onsubmit=e=>{e.preventDefault();const sel=open.filter(({k})=>$('#pk_'+k).checked&&n($('#pq_'+k).value)>0);if(!sel.length){toast('Tick at least one item with a quantity','bad');return}
+    if(sel.some(({i,k})=>n($('#pq_'+k).value)>n(i.qty)+1e-9)){toast('PO quantity cannot be more than the requested quantity','bad');return}
+    const sp=supplier($('#f_sup').value);
+    const o={id:uid(),no:Math.max(0,...S.pos.map(x=>n(x.no)))+1,date:$('#f_date').value||today(),prId:p.id,supplierId:sp.id,items:sel.map(({i,k})=>({itemId:i.itemId,qty:n($('#pq_'+k).value),price:n($('#pu_'+k).value),cpu:n(i.cpu),cu:i.cu||''})),status:'Issued',creditDays:n(sp.days),expected:$('#f_expected').value,deliveredDate:'',dueDate:'',payments:[],note:$('#f_note').value.trim(),hist:[{s:'Issued',date:today(),by:me.name}]};
+    S.pos.push(o);sel.forEach(({i})=>i.poId=o.id);
+    p.status=p.items.every(i=>i.poId)?'Ordered':'Part ordered';(p.hist=p.hist||[]).push({s:p.status,date:today(),by:me.name});
+    save();closeModal();ui.procTab='po';ui.poF='open';render();toast(poNo(o)+' issued and sent to Finance')}}
+
+function poDetail(id){
+  const o=po(id),E=ed('proc'),m=M(),pp=poPay(o),sp=supplier(o.supplierId),pr=S.prs.find(x=>x.id===o.prId);
+  const rows=o.items.map(i=>{const it=iitem(i.itemId);return `<tr><td class="code">${it?iCode(it):''}</td><td>${esc(it?it.name:'(deleted)')}</td><td>${esc(it?it.unit:'')}</td><td class="num">${fq(i.qty)}${i.recQty!=null&&n(i.recQty)!==n(i.qty)?`<div class="small" style="color:var(--warn)">received ${fq(i.recQty)}</div>`:''}</td>${m?`<td class="num">${fm(i.price)}${n(i.cpu)?'/'+esc(i.cu):''}</td><td class="num">${fm(lineAmt(i))}</td>`:''}</tr>`}).join('');
+  const pays=(o.payments||[]).map(y=>`<tr><td>${fd(y.date)}</td><td class="small">${esc(y.ref)}</td><td class="num">${fm(y.amount)}</td></tr>`).join('');
+  modal(`<h3>${poNo(o)} <span class="pill ${PO_CL[o.status]}" style="vertical-align:middle">${PO_LABEL[o.status]}</span></h3>
+  <div class="ipc-head"><div><div class="l">Supplier</div><div class="v">${esc(sp?sp.name:'—')}</div><div class="small muted">${esc(sp?sp.phone:'')}</div></div><div><div class="l">PO date</div><div class="v">${fd(o.date)}</div></div><div><div class="l">From request</div><div class="v">${pr?prNo(pr)+' · '+pr.source:'—'}</div></div><div><div class="l">Credit term</div><div class="v">${termLabel(o.creditDays)}</div></div><div><div class="l">${o.deliveredDate?'Delivered':'Expected delivery'}</div><div class="v">${fd(o.deliveredDate||o.expected)}</div></div>${o.receivedDate?`<div><div class="l">Received in stock</div><div class="v">${fd(o.receivedDate)}</div><div class="small muted">${esc(o.receivedBy||'')}</div></div>`:''}${m?`<div><div class="l">Payment due</div><div class="v">${o.dueDate?fd(o.dueDate):'After delivery'}</div></div>`:''}</div>
+  ${o.note?`<p class="small">${esc(o.note)}</p>`:''}
+  <div class="tw"><table><thead><tr><th>No.</th><th>Item</th><th>Unit</th><th class="num">Qty</th>${m?'<th class="num">Unit price</th><th class="num">Amount</th>':''}</tr></thead><tbody>${rows}${m?`<tr class="tot"><td colspan="5">Total</td><td class="num">${fm(pp.amt)}</td></tr>`:''}</tbody></table></div>
+  ${m?`<div class="sec"><div class="sechead"><h2>Payments</h2><span class="pill ${pp.tag[1]}">${pp.tag[0]}</span></div>${pays?`<div class="tw"><table><thead><tr><th>Date</th><th>Reference</th><th class="num">Amount</th></tr></thead><tbody>${pays}<tr class="tot"><td colspan="2">Balance to pay</td><td class="num">${fm(pp.bal)}</td></tr></tbody></table></div>`:`<p class="small muted" style="margin:0">No payments yet. Balance ${fm(pp.bal)}.</p>`}</div>`:''}
+  <div class="mact">${E&&PO_CAN_CANCEL(o)?`<button class="btn danger" data-act="poCancel" data-id="${o.id}">Cancel PO</button>`:''}<button class="btn" data-act="close">Close</button>${PAY()&&o.status!=='Cancelled'&&pp.bal>0.004?`<button class="btn" data-act="poPayNew" data-id="${o.id}">Record payment</button>`:''}${E&&PO_NEXT[o.status]?`<button class="btn pri" data-act="poAdvance" data-id="${o.id}">${PO_BTN[o.status]}</button>`:''}</div>`,true)}
+
+function poAdvance(o){const nx=PO_NEXT[o.status];if(!nx)return;o.status=nx;(o.hist=o.hist||[]).push({s:nx,date:today(),by:me.name});
+  if(nx==='Delivered'){o.deliveredDate=today();o.dueDate=addDays(o.deliveredDate,o.creditDays)}
+  save();toast(poNo(o)+': '+PO_LABEL[nx]+(nx==='Delivered'?' · Stock has been notified to receive it':''))}
+
+function recvSection(aw,E){if(!aw.length)return '';
+  return `<div class="sec" style="margin-top:0;margin-bottom:22px"><div class="alert warn" role="status" style="margin:0"><b>Delivered by Procurement — check the goods and receive them</b><div class="small">Items count as on hand only after you receive them here.</div></div><div class="tw"><table><thead><tr><th>PO</th><th>Supplier</th><th>From request</th><th>Delivered</th><th>Items</th><th></th></tr></thead><tbody>${aw.map(o=>{const sp=supplier(o.supplierId),pr=S.prs.find(x=>x.id===o.prId);return `<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(sp?sp.name:'—')}</td><td class="code">${pr?prNo(pr)+' · '+pr.source:'—'}</td><td>${fd(o.deliveredDate)}</td><td class="small">${itemsBrief(o.items)}</td><td class="act">${E?`<button class="btn pri sm" data-act="poReceive" data-id="${o.id}">Receive</button>`:''}</td></tr>`}).join('')}</tbody></table></div></div>`}
+
+function poReceive(id){const o=po(id);
+  const rows=o.items.map((i,k)=>{const it=iitem(i.itemId);return `<tr><td class="code">${it?iCode(it):''}</td><td>${esc(it?it.name:'(deleted)')}</td><td>${esc(it?it.unit:'')}</td><td class="num">${fq(i.qty)}</td><td class="num"><input class="qin" id="rq_${k}" type="number" step="any" min="0" value="${i.qty}" aria-label="Received qty ${esc(it?it.name:'')}"></td></tr>`}).join('');
+  modal(`<h3>Receive ${poNo(o)} into stock</h3><p class="small muted" style="margin-top:0">${esc(supplier(o.supplierId)?.name||'')} · delivered ${fd(o.deliveredDate)}. Count the goods and enter the quantity actually received.</p><form id="rcf" class="fgrid"><div class="full tw"><table><thead><tr><th>No.</th><th>Item</th><th>Unit</th><th class="num">Ordered</th><th class="num">Received</th></tr></thead><tbody>${rows}</tbody></table></div>${field({k:'date',l:'Received date',t:'date',v:today()})}${field({k:'ref',l:'Delivery note no.'})}<div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Receive into stock</button></div></form>`,true);
+  $('#rcf').onsubmit=e=>{e.preventDefault();const date=$('#f_date').value||today(),ref=$('#f_ref').value.trim();let short=0;
+    o.items.forEach((i,k)=>{const q=n($('#rq_'+k).value);i.recQty=q;if(q<n(i.qty))short++;if(q>0)S.moves.push({id:uid(),date,itemId:i.itemId,type:'IN',qty:q,ref:poNo(o)+(ref?' · '+ref:''),by:me.name})});
+    if(!o.deliveredDate){o.deliveredDate=date;o.dueDate=addDays(date,o.creditDays)}o.status='Received';o.receivedDate=date;o.receivedBy=me.name;(o.hist=o.hist||[]).push({s:'Received',date,by:me.name});
+    save();closeModal();render();toast(poNo(o)+' received into stock'+(short?` · ${short} item${short>1?'s':''} short`:''))}}
+
+function payForm(title,bal,onSave){form(title,[{k:'date',l:'Payment date',t:'date',v:today()},{k:'amount',l:`Amount (balance ${fm(bal)})`,t:'number',v:r2(bal),req:true},{k:'ref',l:'Reference (bank transfer, cheque no.)',full:true}],
+  v=>{if(v.amount<=0)return'Enter an amount';if(v.amount>bal+0.004)return'Amount is more than the balance';onSave({id:uid(),date:v.date||today(),amount:r2(v.amount),ref:v.ref,by:me.name});toast('Payment recorded')},'Record payment')}
+
+/* ---------- 8–10. FINANCE ---------- */
+function apAlert(){
+  const due=S.pos.filter(DELIV).map(o=>({o,p:poPay(o)})).filter(x=>x.p.bal>0.004&&x.p.days<=7).sort((a,b)=>a.p.days-b.p.days);
+  if(!due.length)return'';const over=due.some(x=>x.p.days<0);
+  return `<div class="alert ${over?'':'warn'}" role="status"><b>Supplier payments due by credit term</b>${due.map(({o,p})=>`<div class="small">${poNo(o)} · ${esc(supplier(o.supplierId)?.name||'')} · <b>${fm(p.bal)}</b> · ${p.tag[0]} <span class="muted">(due ${fd(o.dueDate)}, ${termLabel(o.creditDays)})</span></div>`).join('')}</div>`}
+
+V.inv=()=>{
+  const E=PAY(),ready=readyClaims(),list=[...S.invoices].sort((a,b)=>b.no-a.no);
+  const rrows=ready.map(c=>{const t=claimNet(c);return `<tr><td class="code"><b>${ipcNo(c)}</b></td><td>${fd(c.date)}</td><td class="num">${fm(t.cur)}</td><td class="num">${fm(-t.ret)}</td><td class="num"><b>${fm(t.net)}</b></td><td class="act">${E?`<button class="lnk" data-act="invNew" data-id="${c.id}">Issue invoice</button>`:''}</td></tr>`}).join('');
+  const rows=list.map(i=>{const c=S.claims.find(x=>x.id===i.claimId),p=invPay(i);return `<tr><td class="code"><b>${invNo(i)}</b></td><td class="code">${c?ipcNo(c):'—'}</td><td>${fd(i.date)}</td><td>${fd(i.dueDate)}</td><td class="num">${fm(i.amount)}</td><td class="num">${fm(p.amt-n(i.amount))}</td><td class="num"><b>${fm(p.amt)}</b></td><td class="num">${fm(p.paid)}</td><td class="num">${p.bal>0.004?fm(p.bal):'<span class="muted">—</span>'}</td><td><span class="pill ${p.tag[1]}">${p.tag[0]}</span></td><td class="act"><button class="lnk" data-act="invOpen" data-id="${i.id}">Open</button>${E&&p.bal>0.004?`<button class="lnk" data-act="invPayNew" data-id="${i.id}">Payment</button>`:''}</td></tr>`}).join('');
+  const tot=sum(list,invTotal),paid=sum(list,paidOf);
+  const pays=list.flatMap(i=>(i.payments||[]).map(y=>({y,i}))).sort((a,b)=>a.y.date<b.y.date?1:-1);
+  const prows=pays.slice(0,20).map(({y,i})=>`<tr><td>${fd(y.date)}</td><td class="code">${invNo(i)}</td><td class="small">${esc(y.ref)}</td><td class="num">${fm(y.amount)}</td></tr>`).join('');
+  const k=(l,v,s,c='')=>`<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  return ph('Section 8 · Client invoices from progress claims','Invoices')+
+  `<div class="kpis">${k('Invoiced to date',fm(tot),`${list.length} invoices incl. VAT`)}${k('Received',fm(paid),`${pays.length} payments`)}${k('Outstanding',fm(tot-paid),'Details in Receivables (AR)','hero')}${k('Ready to invoice',ready.length,'Approved claims')}</div>
+  <div class="sec" style="margin-top:0"><h2>Approved claims ready to invoice</h2>${ready.length?`<div class="tw"><table><thead><tr><th>Claim</th><th>Valuation date</th><th class="num">Work this period</th><th class="num">Retention</th><th class="num">Net due</th><th></th></tr></thead><tbody>${rrows}</tbody></table></div>`:'<div class="empty">No approved claims waiting. A claim appears here once it is marked approved in Progress Claim.</div>'}</div>
+  <div class="sec"><h2>Issued invoices</h2>${list.length?`<div class="tw"><table><thead><tr><th>Invoice</th><th>Claim</th><th>Date</th><th>Due</th><th class="num">Amount</th><th class="num">VAT</th><th class="num">Total</th><th class="num">Received</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No invoices yet.</div>'}</div>
+  <div class="sec"><h2>Payments received</h2>${prows?`<div class="tw"><table class="ledger"><thead><tr><th>Date</th><th>Invoice</th><th>Reference</th><th class="num">Amount</th></tr></thead><tbody>${prows}</tbody></table></div>`:'<div class="empty">No payments received yet.</div>'}</div>`;
+};
+
+V.ar=()=>{
+  const list=S.invoices.map(i=>({i,p:invPay(i)})).filter(x=>x.p.bal>0.004).sort((a,b)=>a.p.days-b.p.days);
+  const B=[['Not yet due',x=>x.p.days>=0],['1–30 days overdue',x=>x.p.days<0&&x.p.days>=-30],['31–60 days overdue',x=>x.p.days<-30&&x.p.days>=-60],['Over 60 days overdue',x=>x.p.days<-60]];
+  const tiles=`<div class="kpis"><div class="kpi hero"><div class="l">Total receivable</div><div class="v">${fm(sum(list,x=>x.p.bal))}</div><div class="s">${list.length} unpaid invoice${list.length===1?'':'s'}</div></div>${B.map(([l,f],ix)=>{const g=list.filter(f);return `<div class="kpi"><div class="l">${l}</div><div class="v" style="${ix&&g.length?'color:var(--bad)':''}">${fm(sum(g,x=>x.p.bal))}</div><div class="s">${g.length} invoice${g.length===1?'':'s'}</div></div>`}).join('')}</div>`;
+  const rows=list.map(({i,p})=>{const c=S.claims.find(x=>x.id===i.claimId);return `<tr><td class="code"><b>${invNo(i)}</b></td><td class="code">${c?ipcNo(c):'—'}</td><td>${fd(i.date)}</td><td>${fd(i.dueDate)}</td><td class="num">${fm(p.amt)}</td><td class="num">${fm(p.paid)}</td><td class="num"><b>${fm(p.bal)}</b></td><td><span class="pill ${p.tag[1]}">${p.tag[0]}</span></td><td class="act"><button class="lnk" data-act="invOpen" data-id="${i.id}">Open</button>${PAY()?`<button class="lnk" data-act="invPayNew" data-id="${i.id}">Payment</button>`:''}</td></tr>`}).join('');
+  return ph('Section 9 · Invoices waiting for client payment','Receivables (AR)')+tiles+(list.length?`<div class="tw"><table><thead><tr><th>Invoice</th><th>Claim</th><th>Date</th><th>Due</th><th class="num">Total</th><th class="num">Received</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">Every issued invoice is paid.</div>');
+};
+
+V.ap=()=>{
+  const E=PAY(),sup=S.pos.filter(o=>o.status!=='Cancelled').map(o=>({o,p:poPay(o)}));
+  const toPay=sup.filter(x=>DELIV(x.o)&&x.p.bal>0.004),over=toPay.filter(x=>x.p.days<0),due7=toPay.filter(x=>x.p.days>=0&&x.p.days<=7);
+  const onOrder=sup.filter(x=>!DELIV(x.o)&&x.p.bal>0.004);
+  const lab=S.subs.flatMap(s=>(s.reqs||[]).map(r=>({s,r}))),lWait=lab.filter(x=>x.r.status==='Requested'),ip=ipcToPay();
+  const k=(l,v,s,st='')=>`<div class="kpi"><div class="l">${l}</div><div class="v" style="${st}">${v}</div><div class="s">${s}</div></div>`;
+  const pl=a=>a.length===1?'':'s';
+  const tiles=`<div class="kpis">${k('Supplier balance due',fm(sum(toPay,x=>x.p.bal)),`${toPay.length} delivered PO${pl(toPay)} unpaid`)}${k('Overdue',fm(sum(over,x=>x.p.bal)),`${over.length} PO${pl(over)}`,over.length?'color:var(--bad)':'')}${k('Due within 7 days',fm(sum(due7,x=>x.p.bal)),`${due7.length} PO${pl(due7)}`,due7.length?'color:var(--warn)':'')}${k('On order',fm(sum(onOrder,x=>x.p.bal)),`${onOrder.length} PO${pl(onOrder)} not delivered yet`)}${k('Labour to pay',fm(sum(lWait,x=>x.r.amount)+sum(ip,x=>x.bal)),`${lWait.length+ip.length} request${pl(lWait.length+ip.length)} waiting`)}</div>`;
+  const tab=(key,id,l,c)=>`<button class="chip ${ui[key]===id?'on':''}" data-act="setF" data-key="${key}" data-id="${id}">${l}<span class="c">${c}</span></button>`;
+  const head=ph('Section 10 · Supplier and labour payments','Payables (AP)')+apAlert()+tiles+`<div class="toolbar"><div class="chips">${tab('apTab','sup','Supplier payments',toPay.length)}${tab('apTab','lab','Labour payments',lWait.length+ip.length)}</div></div>`;
+  if(ui.apTab==='lab'){
+    const row=({s,r})=>{const sc=scope(s.scopeId);return `<tr><td><b>${esc(s.name)}</b><div class="small muted">${esc(sc?sc.name:'')}</div></td><td class="code">#${r.no}</td><td>${fd(r.date)}</td><td>${esc(r.desc)}</td><td class="num"><b>${fm(r.amount)}</b></td><td>${r.status==='Paid'?`<span class="pill ok">Paid</span><div class="small muted">${fd(r.paidDate)}${r.payRef?' · '+esc(r.payRef):''}</div>`:'<span class="pill warn">Requested</span>'}</td><td class="act">${E&&r.status!=='Paid'?`<button class="lnk" data-act="payReq" data-s="${s.id}" data-id="${r.id}">Pay</button>`:''}</td></tr>`};
+    const paid=lab.filter(x=>x.r.status==='Paid').sort((a,b)=>(b.r.paidDate||b.r.date)>(a.r.paidDate||a.r.date)?1:-1).slice(0,20);
+    const th='<thead><tr><th>Sub-contractor</th><th>Req.</th><th>Date</th><th>Work covered</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>';
+    return head+ipcApSection(E)+`<div class="sec" style="${ipcLinked()?'':'margin-top:0'}"><h2>Waiting for payment${ipcLinked()?' — sub-contracts in this system':''}</h2>${lWait.length?`<div class="tw"><table>${th}<tbody>${lWait.map(row).join('')}</tbody></table></div>`:'<div class="empty">No labour payment requests waiting.</div>'}</div><div class="sec"><h2>Recently paid</h2>${paid.length?`<div class="tw"><table>${th}<tbody>${paid.map(row).join('')}</tbody></table></div>`:'<div class="empty">No labour payments yet.</div>'}</div>`;
+  }
+  const F=[['topay','To pay',toPay],['onorder','On order',onOrder],['paid','Paid',sup.filter(x=>x.p.bal<=0.004)],['all','All',sup]];
+  const cur=(F.find(f=>f[0]===ui.apF)||F[0])[2].slice().sort((a,b)=>(a.o.dueDate||'9999')<(b.o.dueDate||'9999')?-1:1);
+  const rows=cur.map(({o,p})=>{const sp=supplier(o.supplierId);return `<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(sp?sp.name:'—')}<div class="small muted">${esc(sp?sp.phone:'')}</div></td><td class="small">${termLabel(o.creditDays)}</td><td>${o.deliveredDate?fd(o.deliveredDate)+(o.status==='Delivered'?'<div class="small muted">not yet received in stock</div>':''):`<span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span>`}</td><td>${o.dueDate?fd(o.dueDate):'<span class="muted">—</span>'}</td><td class="num">${fm(p.amt)}</td><td class="num">${fm(p.paid)}</td><td class="num"><b>${p.bal>0.004?fm(p.bal):'—'}</b></td><td><span class="pill ${p.tag[1]}">${p.tag[0]}</span></td><td class="act"><button class="lnk" data-act="poOpen" data-id="${o.id}">Open</button>${E&&p.bal>0.004?`<button class="lnk" data-act="poPayNew" data-id="${o.id}">Pay</button>`:''}</td></tr>`}).join('');
+  return head+`<div class="toolbar"><div class="chips">${F.map(([id,l,a])=>tab('apF',id,l,a.length)).join('')}</div></div>`+(cur.length?`<div class="tw"><table><thead><tr><th>PO</th><th>Supplier</th><th>Credit term</th><th>Delivered</th><th>Payment due</th><th class="num">Amount</th><th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No purchase orders here.</div>');
+};
+
+/* ---------- LINK: IPC SUB-CONTRACT PAYMENT SYSTEM (read-only) ---------- */
+const IPC={data:null,raw:null,err:'',busy:false};
+function sampleIpc(){return{linked:true,sample:true,at:new Date().toISOString(),errors:[],
+  works:[{id:'w1',name:'ការងារការ៉ូ · Tile'},{id:'w2',name:'ការងារបូក · Plaster'}],
+  contracts:[
+   {id:'w1:c1',work:'w1',src:'demo-tile',project:'The Anajak',projectCode:'HE2026007',location:'SHOP HOUSE C - A18b [06]',contractor:'ខឿន សុឃាង',workType:'ការងារការ៉ូ (ពលកម្ម)',contractValue:2099.01},
+   {id:'w1:c2',work:'w1',src:'demo-tile',project:'The Anajak',projectCode:'HE2026008',location:'SHOP HOUSE C - A18b [07]',contractor:'ខឿន សុឃាង',workType:'ការងារការ៉ូ (ពលកម្ម)',contractValue:2099.01},
+   {id:'w2:c3',work:'w2',src:'demo-plaster',project:'The Anajak',projectCode:'HE2026007',location:'SHOP HOUSE C - A18b [06]',contractor:'សំ សាវី',workType:'ការងារបូក (ពលកម្ម)',contractValue:1450}],
+  claims:[
+   {id:'w1:k1',work:'w1',contractId:'w1:c1',ipcNo:'IPC_HE2026007-001',seq:1,status:'approved',date:'2026-09-12',current:1049.51,retention:104.95,received:944.56,cumulative:1049.51,preparedBy:'សុខ ដារ៉ា'},
+   {id:'w1:k2',work:'w1',contractId:'w1:c1',ipcNo:'IPC_HE2026007-002',seq:2,status:'submitted',date:'2026-10-10',current:419.8,retention:41.98,received:377.82,cumulative:1469.31,preparedBy:'សុខ ដារ៉ា'},
+   {id:'w1:k3',work:'w1',contractId:'w1:c2',ipcNo:'IPC_HE2026008-001',seq:1,status:'approved',date:'2026-10-02',current:629.7,retention:62.97,received:566.73,cumulative:629.7,preparedBy:'ចាន់ វិចិត្រ'},
+   {id:'w2:k4',work:'w2',contractId:'w2:c3',ipcNo:'IPC_HE2026007-001',seq:1,status:'approved',date:'2026-10-20',current:580,retention:58,received:522,cumulative:580,preparedBy:'សុខ ដារ៉ា'}]}}
+async function loadIpc(force){
+  if(!CLOUD){IPC.raw=sampleIpc();ipcApply();return}
+  if(!me||!['PM','QS','FN','SE'].includes(me.role))return;
+  if(!S.subs.some(x=>x.ipcSheetId)){IPC.raw=IPC.data={linked:false};IPC.err='';return}
+  IPC.busy=true;IPC.err='';if(['sub','ap'].includes(ui.view))render();
+  try{IPC.raw=await api('ipc',{force:!!force});ipcApply()}catch(e){IPC.err=e.message;if(e.auth){sessionExpired();return}}
+  IPC.busy=false;if(me)render()}
+const ipcLinked=()=>!!(IPC.data&&IPC.data.linked);
+const ipcProjOk=(s,c)=>!s.ipcProject||(c.project+' '+c.projectCode).toLowerCase().includes(String(s.ipcProject).trim().toLowerCase());
+const ipcMatch=(s,c)=>c.src===s.ipcSheetId&&(!s.ipcContractor||c.contractor===s.ipcContractor)&&ipcProjOk(s,c);
+// only contracts that belong to a linked sub-contract (its Sheet, contractor and project filter) are used anywhere
+function ipcApply(){const R=IPC.raw;if(!R||!R.linked){IPC.data=R;return}const subs=S.subs.filter(x=>x.ipcSheetId);
+  const cs=R.contracts.filter(c=>subs.some(s=>ipcMatch(s,c))),ids={};cs.forEach(c=>ids[c.id]=1);
+  IPC.data=Object.assign({},R,{contracts:cs,claims:R.claims.filter(c=>ids[c.contractId]),works:R.works.filter(w=>cs.some(c=>c.work===w.id))})}
+const ipcWorkName=id=>((IPC.data&&IPC.data.works||[]).find(w=>w.id===id)||{}).name||'';
+function ipcPaidMap(){const m={};(S.ipcpay||[]).forEach(p=>m[p.claimId]=(m[p.claimId]||0)+n(p.amount));return m}
+const IPC_CL={approved:'ok',submitted:'warn',returned:'bad',draft:''};
+function ipcGroups(){const d=IPC.data,pm=ipcPaidMap(),g={},byC={};
+  d.contracts.forEach(c=>{byC[c.id]=c;const k=c.work+'|'+c.contractor;(g[k]=g[k]||{key:k,work:c.work,contractor:c.contractor,contracts:[],value:0,approved:0,ret:0,net:0,paid:0,pending:0,pendingN:0}).contracts.push(c);g[k].value+=n(c.contractValue)});
+  d.claims.forEach(cl=>{const c=byC[cl.contractId];if(!c)return;const x=g[c.work+'|'+c.contractor];
+    if(cl.status==='approved'){if(/^RET/i.test(cl.ipcNo))x.ret-=n(cl.received);else{x.approved+=n(cl.current);x.ret+=n(cl.retention)}x.net+=n(cl.received);x.paid+=Math.min(n(pm[cl.id]),n(cl.received))}
+    else if(cl.status==='submitted'){x.pending+=n(cl.received);x.pendingN++}});
+  return Object.values(g).map(x=>Object.assign(x,{topay:r2(x.net-x.paid)})).sort((a,b)=>(ipcWorkName(a.work)+a.contractor).localeCompare(ipcWorkName(b.work)+b.contractor))}
+function ipcToPay(){if(!ipcLinked())return[];const d=IPC.data,pm=ipcPaidMap(),byC={};d.contracts.forEach(c=>byC[c.id]=c);
+  return d.claims.filter(cl=>cl.status==='approved'&&n(cl.received)>0&&byC[cl.contractId]).map(cl=>({cl,c:byC[cl.contractId],paid:n(pm[cl.id]),bal:r2(n(cl.received)-n(pm[cl.id]))})).filter(x=>x.bal>0.004).sort((a,b)=>a.cl.date<b.cl.date?-1:1)}
+function subTabs(){const c=ipcLinked()?ipcGroups().length:'';const t=(id,l,cnt)=>`<button class="chip ${(ui.subTab||'own')===id?'on':''}" data-act="setF" data-key="subTab" data-id="${id}">${l}${cnt!==''?`<span class="c">${cnt}</span>`:''}</button>`;
+  return `<div class="toolbar"><div class="chips">${t('own','This system',S.subs.length)}${t('ipc','IPC system',c)}</div></div>`}
+function vIpc(){const d=IPC.data;
+  if(IPC.err)return `<div class="alert" role="status"><b>Cannot read the IPC system</b><div class="small">${esc(IPC.err)}</div></div>`;
+  if(!d||IPC.busy&&!d.contracts)return '<div class="empty">Loading from the IPC system…</div>';
+  if(!d.linked)return `<div class="empty">The IPC system is not linked yet. ${me.role==='PM'?'Add the IPC Sheet link when you add or edit a sub-contract.':'Ask the Project Manager to link it.'}</div>`;
+  const G=ipcGroups(),T=k=>sum(G,g=>g[k]),value=T('value'),appr=T('approved');
+  const k=(l,v,s,c='')=>`<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const rows=G.map(g=>{const open=ui.ipcOpen===g.key;let h=`<tr><td class="small">${esc(ipcWorkName(g.work))}</td><td><b>${esc(g.contractor)}</b></td><td class="num">${g.contracts.length}</td><td class="num">${fm(g.value)}</td><td class="num">${fm(g.approved)}</td><td class="num">${fm(g.ret)}</td><td class="num">${fm(g.paid)}</td><td class="num"><b>${g.topay>0.004?fm(g.topay):'—'}</b></td><td>${g.pendingN?`<span class="pill warn">${g.pendingN} · ${fm(g.pending)}</span>`:'<span class="muted small">—</span>'}</td><td>${bar(g.value?g.approved/g.value:0)}</td><td class="act"><button class="lnk" data-act="ipcOpen" data-id="${esc(g.key)}">${open?'Hide':'Houses'}</button></td></tr>`;
+    if(open){const cs=g.contracts.map(c=>{const cl=IPC.data.claims.filter(x=>x.contractId===c.id);const ap=sum(cl.filter(x=>x.status==='approved'&&!/^RET/i.test(x.ipcNo)),x=>x.current);const last=cl.sort((a,b)=>b.seq-a.seq||(a.date<b.date?1:-1))[0];
+      return `<tr><td>${esc(c.location)}</td><td class="code">${esc(c.projectCode)}</td><td class="num">${fm(c.contractValue)}</td><td class="num">${fm(ap)}</td><td>${bar(n(c.contractValue)?ap/c.contractValue:0)}</td><td>${last?`<span class="code">${esc(last.ipcNo)}</span> <span class="pill ${IPC_CL[last.status]||''}">${esc(last.status)}</span>`:'<span class="muted small">No claim yet</span>'}</td></tr>`}).join('');
+      h+=`<tr><td colspan="11" style="background:var(--thead);padding:12px"><div class="tw"><table><thead><tr><th>Location</th><th>Code</th><th class="num">Contract</th><th class="num">Approved</th><th>Progress</th><th>Latest claim</th></tr></thead><tbody>${cs}</tbody></table></div></td></tr>`}
+    return h}).join('');
+  return `<div class="kpis">${k('Contracts',d.contracts.length,`${G.length} sub-contractor group${G.length===1?'':'s'}`)}${k('Contract value',fm(value),`${d.works.length} work type${d.works.length===1?'':'s'}`)}${k('Approved to date',fm(appr),fp(value?appr/value:0)+' of contract value')}${k('Retention held',fm(T('ret')),'Deducted from approved claims')}${k('Paid',fm(T('paid')),'Recorded by Finance here')}${k('To pay',fm(T('topay')),'Approved, not yet paid','hero')}</div>
+  <div class="toolbar" style="justify-content:space-between"><span class="small muted">Read-only from the IPC system${d.sample?' — <b>sample data</b> (link your IPC Sheet in the Google Sheets version)':''} · updated ${new Date(d.at).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'})}. Requests and approvals are made there; Finance pays in Payables.</span><button class="btn sm" data-act="ipcReload">Reload from IPC</button></div>
+  ${(d.errors||[]).length?`<div class="alert warn" role="status"><b>Some IPC Sheets could not be read</b>${d.errors.map(e=>`<div class="small">${esc(e)}</div>`).join('')}</div>`:''}
+  ${G.length?`<div class="tw"><table><thead><tr><th>Work</th><th>Sub-contractor</th><th class="num">Houses</th><th class="num">Contract value</th><th class="num">Approved</th><th class="num">Retention</th><th class="num">Paid</th><th class="num">To pay</th><th>Waiting approval</th><th>Progress</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No IPC contracts found for this project. Check the IPC link, contractor and project filter on each sub-contract.</div>'}`}
+function ipcApSection(E){if(!ipcLinked())return '';const list=ipcToPay();
+  const rows=list.map(({cl,c,paid,bal})=>`<tr><td class="code"><b>${esc(cl.ipcNo)}</b></td><td><b>${esc(c.contractor)}</b><div class="small muted">${esc(ipcWorkName(c.work))}</div></td><td class="small">${esc(c.location)}</td><td>${fd(cl.date)}</td><td class="num">${fm(cl.current)}</td><td class="num">${fm(-cl.retention)}</td><td class="num"><b>${fm(bal)}</b>${paid>0?`<div class="small muted">of ${fm(cl.received)}</div>`:''}</td><td class="act">${E?`<button class="lnk" data-act="ipcPay" data-id="${esc(cl.id)}">Pay</button>`:''}</td></tr>`).join('');
+  const done=[...(S.ipcpay||[])].sort((a,b)=>a.date<b.date?1:-1).slice(0,10);
+  return `<div class="sec" style="margin-top:0"><h2>Approved in the IPC system</h2>${list.length?`<div class="tw"><table><thead><tr><th>IPC no.</th><th>Sub-contractor</th><th>Location</th><th>Date</th><th class="num">This claim</th><th class="num">Retention</th><th class="num">To pay</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No approved IPC claims waiting for payment.</div>'}
+  ${done.length?`<details><summary class="small">Recent IPC payments (${done.length})</summary><div class="tw" style="margin-top:6px"><table class="ledger"><tbody>${done.map(p=>`<tr><td>${fd(p.date)}</td><td class="code">${esc(p.ipcNo)}</td><td>${esc(p.contractor)}<div class="small muted">${esc(p.location)}</div></td><td class="small">${esc(p.ref)}</td><td class="num">${fm(p.amount)}</td></tr>`).join('')}</tbody></table></div></details>`:''}</div>`}
+
+/* ---------- ITEM CATALOGUE (SAP item master) ---------- */
+const CAT={rows:null};
+function sampleCatalog(){const G='Golden Da Vinci (Gray)';
+  const al=[['I-AL-0001006','គ្រោងក្រៅ /ប្រផេះផ្លេក/ZT10001/5.95M/1.8mm/ Golden Da Vinci (Gray)','ZT10001','1.8mm',10.2,4.1515],
+   ['I-AL-0001007','មេសន្លឹកជ្រុង /ប្រផេះផ្លេក/ZT10004A/5.95M/1.4mm/ Golden Da Vinci (Gray)','ZT10004A','1.4mm',8.05,3.4298],
+   ['I-AL-0001008','AL/ មេបង្រួមខ្នាតកញ្ចក់/ ប្រផេះផ្លេក/ ZT10030/ 5.95M/ 1.4mm/ Golden Da Vinci (Grey)','ZT10030','1.4mm',1.95,3.845],
+   ['I-AL-0001009','ព្រុយមេទំពក់ /ប្រផេះផ្លេក/ZT10021/5.95M/1.2mm/ Golden Da Vinci (Gray)','ZT10021','1.2mm',3,3.43],
+   ['I-AL-0001129','AL/ Uកង់លើ/ ប្រផេះផ្លេក/ GDW8115/ 5.95M/ 1.8mm/ Golden Da Vinci (Grey)','GDW8115','1.8mm',2.2,3.8443],
+   ['I-AL-0001011','AL/ មេកង់ក្រោម/ ប្រផេះផ្លេក /GTM12014A/ 5.95M/ 1.8mm/ Golden Da Vinci (Grey)','GTM12014A','1.8mm',1,4.152],
+   ['I-AL-0001012','AL/ នីវកឹបស្មើ/ ប្រផេះផ្លេក/ GTM12027/ 5.95M/ 1.5mm/ Golden Da Vinci (Grey)','GTM12027','1.5mm',0.65,4.1518],
+   ['I-AL-0001013','AL/ មេសោរ/ ប្រផេះផ្លេក/ 100BJ04/ 5.95M/ 1.0mm/ Golden Da Vinci (Grey)','100BJ04','1.0mm',0.9,3.8459]]
+   .map(([code,name,pc,th,kg,p])=>({id:code,code,name,productCode:pc,color:G,thickness:th,length:'5.95',supplier:'AL-Guangdong',unit:'pcs',cu:'kg',cpu:kg,price:p}));
+  return al.concat([
+   {id:'I-GL-0000021',code:'I-GL-0000021',name:'កញ្ចក់ឆៅ សថ្លា 8លី (ខ្នាតទូទៅ)',productCode:'',color:'NON',thickness:'8mm',length:'',supplier:'Local',unit:'m2',cu:'',cpu:0,price:6.9},
+   {id:'I-HW-0000430',code:'I-HW-0000430',name:'ដែករ៉ៃ ទ្វារបត់ SUS Pathway (6m)',productCode:'SUS Pathway',color:'Stainless-Steel',thickness:'',length:'',supplier:'Acc-GuangDong',unit:'pcs',cu:'',cpu:0,price:7.02},
+   {id:'I-HW-0000407',code:'I-HW-0000407',name:'កាវសាច់ក្រក កំបោរ A390 WHITE 019# (500ml)',productCode:'Antas-193',color:'WHITE',thickness:'',length:'',supplier:'Oversea',unit:'pcs',cu:'',cpu:0,price:1.98}])}
+async function getCatalog(force){if(CAT.rows&&!force)return CAT.rows;
+  if(!CLOUD){try{CAT.rows=JSON.parse(lsGet(KEY+'-cat')||'null')}catch(e){CAT.rows=null}if(!CAT.rows)CAT.rows=sampleCatalog();return CAT.rows}
+  try{const r=await api('catalog');CAT.rows=r.rows||[]}catch(e){handleErr(e);return []}return CAT.rows}
+const catFind=code=>(CAT.rows||[]).find(r=>String(r.code).toLowerCase()===String(code||'').trim().toLowerCase());
+// SAP export columns: Item No. | Item Description | Item Remarks (product code) | UoM Group (kg per bar) | Thickness | Color | Type | Length | Item Cost | Last Purchase Price | Inventory UoM
+function rowsFromSap(rows,col){const c={code:col('item no.'),name:col('item description'),pc:col('item remarks'),uom:col('uom group'),th:col('thickness'),color:col('color'),type:col('type'),len:col('length'),cost:col('item cost'),lpp:col('last purchase price'),inv:col('inventory uom')};
+  if(c.code<0||c.name<0)return null;const out={},cell=(r,i)=>i<0?'':String(r[i]??'').trim();
+  rows.forEach(r=>{const code=cell(r,c.code);if(!code||out[code])return;const kg=parseFloat(cell(r,c.uom)),inv=cell(r,c.inv).toLowerCase(),byW=kg>0&&inv==='kg';
+    const price=parseFloat(cell(r,c.lpp))||parseFloat(cell(r,c.cost))||0;
+    out[code]={id:code,code,name:cell(r,c.name),productCode:cell(r,c.pc),color:cell(r,c.color),thickness:cell(r,c.th),length:cell(r,c.len),supplier:cell(r,c.type),unit:byW?'pcs':(inv||'pcs'),cu:byW?'kg':'',cpu:byW?kg:0,price:Math.round(price*10000)/10000}});
+  return Object.values(out)}
+function parseSap(text){const lines=String(text||'').split(/\r?\n/).filter(l=>l.trim());const hi=lines.findIndex(l=>/item no\./i.test(l));if(hi<0)return null;
+  const H=lines[hi].split('\t').map(h=>h.trim().toLowerCase());return rowsFromSap(lines.slice(hi+1).map(l=>l.split('\t')),k=>H.indexOf(k))}
+function loadXlsx(){return window.XLSX?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=ok;s.onerror=()=>no(new Error('Could not load the Excel reader'));document.head.appendChild(s)})}
+async function sapFromFile(f){await loadXlsx();const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+  for(const name of wb.SheetNames){const a=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:''});const hi=a.slice(0,10).findIndex(r=>r.some(v=>/^item no\.?$/i.test(String(v).trim())));
+    if(hi>=0){const H=a[hi].map(h=>String(h).trim().toLowerCase());const rows=rowsFromSap(a.slice(hi+1),k=>H.indexOf(k));if(rows&&rows.length)return rows}}
+  return null}
+async function catModal(){const rows=await getCatalog(),E=ed('internal');
+  modal(`<h3>Item catalogue <span class="pill" style="vertical-align:middle">${rows.length} items</span></h3><p class="small muted" style="margin-top:0">The SAP item master. Each system code is one item — profile, colour, length and thickness. Internal BOQ items take their name, unit, kg per bar and price from here.</p>
+  <input class="in" id="catq" placeholder="Search code, name or product code" aria-label="Search catalogue"><div id="catres" style="margin-top:10px"></div>
+  ${E?`<div class="sec"><h2>Update from SAP</h2><p class="small muted" style="margin:0">Choose the BOQ or SAP Excel file — the app finds the sheet with the <b>Item No.</b> header (e.g. “8-DATA SAP”). Or copy that sheet including the header row and paste it below. This replaces the whole catalogue.</p><input class="in" id="catfile" type="file" accept=".xlsx,.xls"><textarea class="in" id="catpaste" rows="3" placeholder="…or paste the SAP rows here, with the header row"></textarea><div class="acts"><button class="btn pri" data-act="catImport">Import catalogue</button></div></div>`:''}
+  <div class="mact"><button class="btn" data-act="close">Close</button></div>`,true);
+  const show=()=>{const q=$('#catq').value.trim().toLowerCase();const hit=(q?rows.filter(r=>(r.code+' '+r.name+' '+r.productCode).toLowerCase().includes(q)):rows).slice(0,40);
+    $('#catres').innerHTML=hit.length?`<div class="tw" style="max-height:40vh;overflow:auto"><table><thead><tr><th>Code</th><th>Item</th><th>Product</th><th>Length</th><th>Thick.</th><th class="num">Priced by</th>${M()?'<th class="num">Price</th>':''}</tr></thead><tbody>${hit.map(r=>`<tr><td class="code">${esc(r.code)}</td><td class="small">${esc(r.name)}</td><td class="code">${esc(r.productCode)}</td><td>${esc(r.length)}</td><td>${esc(r.thickness)}</td><td class="num small">${r.cpu?fq(r.cpu)+' kg/pcs':esc(r.unit)}</td>${M()?`<td class="num">${fm(r.price)}${r.cu?'/'+esc(r.cu):''}</td>`:''}</tr>`).join('')}</tbody></table></div>${rows.length>40&&!q?'<p class="hint">Showing the first 40. Search to find others.</p>':''}`:'<div class="empty">No items found.</div>'};
+  $('#catq').addEventListener('input',show);show()}
+function catHook(){const el=$('#f_code');if(!el)return;
+  getCatalog().then(rows=>{if(!rows.length||!$('#f_code'))return;let dl=$('#catlist');if(!dl){dl=document.createElement('datalist');dl.id='catlist';document.body.appendChild(dl)}
+    if(dl.childElementCount!==rows.length)dl.innerHTML=rows.map(r=>`<option value="${esc(r.code)}">${esc(r.name)}</option>`).join('');el.setAttribute('list','catlist')});
+  el.addEventListener('change',()=>{const r=catFind(el.value);if(!r){if(el.value.trim())toast('Code not in the item catalogue — fill in the details yourself');return}
+    const set=(k,v)=>{const f=$('#f_'+k);if(f)f.value=v};set('name',r.name);set('unit',r.unit);set('cu',r.cu);set('cpu',r.cpu||'');set('rate',r.price||'');toast('Filled from the catalogue')})}
+function pasteItemsModal(sec){
+  modal(`<h3>Paste items into Section ${secLetter(sec)} — ${esc(sec.name)}</h3><p class="small muted" style="margin-top:0">In your BOQ sheet, select the item rows from the <b>SAP CODE</b> column to the <b>quantity (pcs)</b> column — e.g. columns B to J — copy, and paste here. Each row needs a code from the item catalogue; the last number on the row is used as the quantity.</p>
+  <form id="pif" class="fgrid"><label class="f full" for="pit">Rows from the BOQ<textarea class="in" id="pit" rows="8" placeholder="I-AL-0001006 … 3"></textarea></label>${field({k:'rate',l:'Price per kg for aluminium (blank = catalogue price)',t:'number',v:''})}<div class="full small" id="pip"></div><div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Add items</button></div></form>`,true);
+  const parse=()=>$('#pit').value.split(/\r?\n/).map(l=>l.split('\t').map(x=>x.trim())).filter(c=>c.some(Boolean)).map(c=>{const code=c.find(x=>/^[A-Z]-[A-Z]{2}-\d+$/i.test(x));const nums=c.filter(x=>x!==code).map(x=>parseFloat(x.replace(/,/g,''))).filter(x=>!isNaN(x));return{code,qty:nums.length?nums[nums.length-1]:0,r:code?catFind(code):null}}).filter(x=>x.code);
+  const prev=()=>{const L=parse(),bad=L.filter(x=>!x.r);$('#pip').innerHTML=L.length?`${L.length} row${pl(L.length)} found${bad.length?` · <b style="color:var(--bad)">not in the catalogue: ${bad.map(x=>esc(x.code)).join(', ')}</b>`:''}`:''};
+  $('#pit').addEventListener('input',prev);
+  $('#pif').onsubmit=e=>{e.preventDefault();const L=parse().filter(x=>x.r&&x.qty>0);if(!L.length){toast('No rows with a catalogue code and a quantity','bad');return}
+    const kg=n($('#f_rate').value);
+    L.forEach(({r,qty})=>S.iitems.push({id:uid(),sectionId:sec.id,code:r.code,name:r.name,unit:r.unit,qty,cu:r.cu,cpu:r.cpu,rate:r.cu==='kg'&&kg?kg:r.price,stock:true}));
+    save();closeModal();render();toast(`Added ${L.length} item${pl(L.length)}`)}}
+
+/* ---------- REPORTS (per role, per period) ---------- */
+const REPORTS=[['pay','Payments to make','PM FN'],['recv','Money to receive','PM FN'],['proc','Purchasing','PM PC FN'],['stock','Stock movement','PM ST'],['site','Site progress','PM SE QS'],['qs','Claims & sub-contracts','PM QS FN']];
+const ymd=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+function monthRange(off){const d=new Date();return[ymd(new Date(d.getFullYear(),d.getMonth()+off,1)),ymd(new Date(d.getFullYear(),d.getMonth()+off+1,0))]}
+function period(){const p=ui.rp||{t:'this'};if(p.t==='custom'){const a=p.from||today(),b=p.to||a;return a<=b?[a,b]:[b,a]}return monthRange({last:-1,this:0,next:1}[p.t]||0)}
+const inP=(d,P)=>!!d&&d>=P[0]&&d<=P[1];
+const rTbl=(h,rows,foot='')=>rows.length?`<div class="tw"><table><thead><tr>${h.map(x=>`<th${x[0]==='#'?' class="num"':''}>${x.replace(/^#/,'')}</th>`).join('')}</tr></thead><tbody>${rows.join('')}${foot}</tbody></table></div>`:'<div class="empty">Nothing for this period.</div>';
+const rKp=(l,v,s,c='',st='')=>`<div class="kpi ${c}"><div class="l">${l}</div><div class="v" style="${st}">${v}</div><div class="s">${s}</div></div>`;
+const rSec=(t,s,body)=>`<div class="sec"><div class="sechead"><h2>${t}</h2>${s?`<span class="small muted">${s}</span>`:''}</div>${body}</div>`;
+const rTot=(cols,label,v)=>`<tr class="tot"><td colspan="${cols}">${label}</td><td class="num">${fm(v)}</td></tr>`;
+const RPT={};
+RPT.pay=P=>{
+  const due=S.pos.filter(DELIV).map(o=>({o,p:poPay(o)})).filter(x=>x.p.bal>0.004&&x.o.dueDate&&x.o.dueDate<=P[1]).sort((x,y)=>x.o.dueDate<y.o.dueDate?-1:1);
+  const exp=S.pos.filter(o=>PO_CAN_CANCEL(o)&&o.expected).map(o=>({o,p:poPay(o),due:addDays(o.expected,o.creditDays)})).filter(x=>x.p.bal>0.004&&x.due<=P[1]).sort((x,y)=>x.due<y.due?-1:1);
+  const lab=S.subs.flatMap(s=>(s.reqs||[]).filter(r=>r.status==='Requested').map(r=>({s,r}))),ip=ipcToPay();
+  const paid=[...S.pos.flatMap(o=>(o.payments||[]).filter(y=>inP(y.date,P)).map(y=>({d:y.date,to:supplier(o.supplierId)?.name||'—',what:poNo(o),ref:y.ref,amt:y.amount}))),
+    ...S.subs.flatMap(s=>(s.reqs||[]).filter(r=>r.status==='Paid'&&inP(r.paidDate,P)).map(r=>({d:r.paidDate,to:s.name,what:'Labour request #'+r.no,ref:r.payRef||'',amt:r.amount}))),
+    ...(S.ipcpay||[]).filter(y=>inP(y.date,P)).map(y=>({d:y.date,to:y.contractor,what:y.ipcNo,ref:y.ref,amt:y.amount}))].sort((x,y)=>x.d<y.d?-1:1);
+  const sup=sum(due,x=>x.p.bal),labT=sum(lab,x=>x.r.amount)+sum(ip,x=>x.bal),over=due.filter(x=>x.o.dueDate<today());
+  const by={};const add=(k,v)=>by[k]=(by[k]||0)+v;due.forEach(x=>add(supplier(x.o.supplierId)?.name||'—',x.p.bal));lab.forEach(x=>add(x.s.name,x.r.amount));ip.forEach(x=>add(x.c.contractor,x.bal));
+  const byRows=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num"><b>${fm(v)}</b></td></tr>`);
+  return `<div class="kpis">${rKp('To pay by '+fd(P[1]),fm(sup+labT),'Suppliers + labour','hero')}${rKp('Suppliers',fm(sup),`${due.length} PO${pl(due.length)} due · ${over.length} overdue`,'',over.length?'color:var(--bad)':'')}${rKp('Labour',fm(labT),`${lab.length+ip.length} request${pl(lab.length+ip.length)} waiting`)}${rKp('May also fall due',fm(sum(exp,x=>x.p.bal)),`${exp.length} PO${pl(exp.length)} not delivered yet`)}${rKp('Paid in this period',fm(sum(paid,x=>x.amt)),`${paid.length} payment${pl(paid.length)}`)}</div>`
+  +rSec('To pay by payee','',rTbl(['Payee','#Amount'],byRows,byRows.length?rTot(1,'Total',sup+labT):''))
+  +rSec('Supplier payments due','Delivered POs, due by the supplier credit term',rTbl(['PO','Supplier','Delivered','Due date','Credit term','#Balance','Status'],due.map(({o,p})=>`<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(supplier(o.supplierId)?.name||'—')}</td><td>${fd(o.deliveredDate)}</td><td>${fd(o.dueDate)}</td><td class="small">${termLabel(o.creditDays)}</td><td class="num"><b>${fm(p.bal)}</b></td><td><span class="pill ${p.tag[1]}">${p.tag[0]}</span></td></tr>`),due.length?rTot(5,'Total suppliers',sup):''))
+  +rSec('Labour payments waiting','Sub-contract requests and approved IPC claims',rTbl(['Payee','For','Date','#Amount'],[...lab.map(({s,r})=>`<tr><td><b>${esc(s.name)}</b><div class="small muted">${esc(scope(s.scopeId)?.name||'')}</div></td><td class="small">Request #${r.no} · ${esc(r.desc)}</td><td>${fd(r.date)}</td><td class="num"><b>${fm(r.amount)}</b></td></tr>`),...ip.map(({cl,c,bal})=>`<tr><td><b>${esc(c.contractor)}</b><div class="small muted">${esc(ipcWorkName(c.work))}</div></td><td class="small"><span class="code">${esc(cl.ipcNo)}</span> · ${esc(c.location)}</td><td>${fd(cl.date)}</td><td class="num"><b>${fm(bal)}</b></td></tr>`)],lab.length+ip.length?rTot(3,'Total labour',labT):''))
+  +rSec('May also fall due','POs not delivered yet — estimated from expected delivery + credit term',rTbl(['PO','Supplier','Expected delivery','Estimated due','#Amount'],exp.map(({o,p,due:d})=>`<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(supplier(o.supplierId)?.name||'—')}</td><td>${fd(o.expected)}</td><td>${fd(d)}</td><td class="num">${fm(p.bal)}</td></tr>`)))
+  +rSec('Paid in this period','',rTbl(['Date','Paid to','For','Reference','#Amount'],paid.map(x=>`<tr><td>${fd(x.d)}</td><td>${esc(x.to)}</td><td class="small">${esc(x.what)}</td><td class="small">${esc(x.ref)}</td><td class="num">${fm(x.amt)}</td></tr>`),paid.length?rTot(4,'Total paid',sum(paid,x=>x.amt)):''))};
+RPT.recv=P=>{
+  const open=S.invoices.map(i=>({i,p:invPay(i)})).filter(x=>x.p.bal>0.004&&x.i.dueDate<=P[1]).sort((a,b)=>a.i.dueDate<b.i.dueDate?-1:1);
+  const issued=S.invoices.filter(i=>inP(i.date,P)),rec=S.invoices.flatMap(i=>(i.payments||[]).filter(y=>inP(y.date,P)).map(y=>({y,i}))),ready=readyClaims(),over=open.filter(x=>x.p.days<0);
+  const ic=i=>{const c=S.claims.find(x=>x.id===i.claimId);return c?ipcNo(c):'—'};
+  return `<div class="kpis">${rKp('To collect by '+fd(P[1]),fm(sum(open,x=>x.p.bal)),`${open.length} invoice${pl(open.length)}`,'hero')}${rKp('Overdue',fm(sum(over,x=>x.p.bal)),`${over.length} invoice${pl(over.length)}`,'',over.length?'color:var(--bad)':'')}${rKp('Invoiced in period',fm(sum(issued,invTotal)),`${issued.length} invoice${pl(issued.length)}`)}${rKp('Received in period',fm(sum(rec,x=>x.y.amount)),`${rec.length} payment${pl(rec.length)}`)}${rKp('Not invoiced yet',ready.length,'Approved claims')}</div>`
+  +rSec('To collect from '+esc(S.settings.client||'client'),'Unpaid invoices due by the end of the period',rTbl(['Invoice','Claim','Invoice date','Due','#Balance','Status'],open.map(({i,p})=>`<tr><td class="code"><b>${invNo(i)}</b></td><td class="code">${ic(i)}</td><td>${fd(i.date)}</td><td>${fd(i.dueDate)}</td><td class="num"><b>${fm(p.bal)}</b></td><td><span class="pill ${p.tag[1]}">${p.tag[0]}</span></td></tr>`),open.length?rTot(4,'Total',sum(open,x=>x.p.bal)):''))
+  +rSec('Invoiced in this period','',rTbl(['Invoice','Claim','Date','#Amount','#VAT','#Total'],issued.map(i=>`<tr><td class="code"><b>${invNo(i)}</b></td><td class="code">${ic(i)}</td><td>${fd(i.date)}</td><td class="num">${fm(i.amount)}</td><td class="num">${fm(invTotal(i)-n(i.amount))}</td><td class="num"><b>${fm(invTotal(i))}</b></td></tr>`)))
+  +rSec('Received in this period','',rTbl(['Date','Invoice','Reference','#Amount'],rec.map(({y,i})=>`<tr><td>${fd(y.date)}</td><td class="code">${invNo(i)}</td><td class="small">${esc(y.ref)}</td><td class="num">${fm(y.amount)}</td></tr>`),rec.length?rTot(3,'Total received',sum(rec,x=>x.y.amount)):''))};
+RPT.proc=P=>{const m=M();
+  const issued=S.pos.filter(o=>inP(o.date,P)).sort((a,b)=>a.no-b.no),dueD=S.pos.filter(o=>PO_CAN_CANCEL(o)&&o.expected&&o.expected<=P[1]).sort((a,b)=>a.expected<b.expected?-1:1),deliv=S.pos.filter(o=>inP(o.deliveredDate,P)),wait=S.prs.filter(PR_OPEN).sort((a,b)=>a.no-b.no);
+  const by={};issued.forEach(o=>{const k=supplier(o.supplierId)?.name||'—';(by[k]=by[k]||{n:0,a:0}).n++;by[k].a+=poTotal(o)});
+  return `<div class="kpis">${rKp('POs issued',issued.length,m?fm(sum(issued,poTotal)):'In this period','hero')}${rKp('Deliveries due',dueD.length,`${dueD.filter(o=>o.expected<today()).length} late`,'',dueD.some(o=>o.expected<today())?'color:var(--bad)':'')}${rKp('Delivered',deliv.length,'In this period')}${rKp('Requests waiting',wait.length,`${wait.filter(p=>p.status==='Pending').length} not accepted yet`)}</div>`
+  +rSec('POs issued','',rTbl(['PO','Date','Supplier','From PR','Items',...(m?['#Amount']:[]),'Delivery'],issued.map(o=>{const pr=S.prs.find(x=>x.id===o.prId);return `<tr><td class="code"><b>${poNo(o)}</b></td><td>${fd(o.date)}</td><td>${esc(supplier(o.supplierId)?.name||'—')}</td><td class="code">${pr?prNo(pr):'—'}</td><td class="small">${itemsBrief(o.items)}</td>${m?`<td class="num">${fm(poTotal(o))}</td>`:''}<td><span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span></td></tr>`}),m&&issued.length?rTot(5,'Total',sum(issued,poTotal)):''))
+  +(m&&issued.length?rSec('By supplier','',rTbl(['Supplier','#POs','#Amount'],Object.entries(by).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.n}</td><td class="num"><b>${fm(v.a)}</b></td></tr>`))):'')
+  +rSec('Deliveries due','Not delivered yet, expected by the end of the period',rTbl(['PO','Supplier','Expected','Status','Items'],dueD.map(o=>`<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(supplier(o.supplierId)?.name||'—')}</td><td>${fd(o.expected)}${o.expected<today()?' <span class="pill bad">Late</span>':''}</td><td><span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span></td><td class="small">${itemsBrief(o.items)}</td></tr>`)))
+  +rSec('Requests waiting for a PO','',rTbl(['PR','Date','Need by','From','Items','Status'],wait.map(p=>`<tr><td class="code"><b>${prNo(p)}</b></td><td>${fd(p.date)}</td><td>${fd(p.needBy)}</td><td>${p.source} · ${esc(p.by)}</td><td class="small">${itemsBrief(p.items)}</td><td><span class="pill ${PR_CL[p.status]||''}">${PR_LABEL[p.status]||esc(p.status)}</span></td></tr>`)))};
+RPT.stock=P=>{
+  const mv=S.moves.filter(x=>inP(x.date,P)),per={};mv.forEach(x=>{const r=per[x.itemId]=per[x.itemId]||{i:0,o:0,a:0};r[x.type==='IN'?'i':x.type==='OUT'?'o':'a']+=n(x.qty)});
+  const rows=Object.entries(per).map(([id,r])=>{const it=iitem(id);return{it,r,s:stockOf(id)}}).filter(x=>x.it).sort((a,b)=>iCode(a.it).localeCompare(iCode(b.it)));
+  const aw=AWAIT(),buy=S.iitems.filter(i=>i.stock).map(i=>({i,s:stockOf(i.id)})).filter(x=>x.s.toBuy>0);
+  return `<div class="kpis">${rKp('Items moved',rows.length,`${mv.length} movement${pl(mv.length)}`,'hero')}${rKp('Receipts',mv.filter(x=>x.type==='IN').length,'Goods received')}${rKp('Issues',mv.filter(x=>x.type==='OUT').length,'Issued to site')}${rKp('Deliveries to receive',aw.length,'Waiting now','',aw.length?'color:var(--warn)':'')}${rKp('Items to purchase',buy.length,'Below Internal BOQ')}</div>`
+  +rSec('Movement by item','',rTbl(['No.','Item','Unit','#Received','#Issued','#Count adj.','#On hand now'],rows.map(({it,r,s})=>`<tr><td class="code">${iCode(it)}</td><td>${esc(it.name)}${it.code?`<div class="small muted code">${esc(it.code)}</div>`:''}</td><td>${esc(it.unit)}</td><td class="num">${r.i?fq(r.i):'—'}</td><td class="num">${r.o?fq(r.o):'—'}</td><td class="num">${r.a?fq(r.a):'—'}</td><td class="num"><b>${fq(s.onHand)}</b>${n(it.cpu)?`<div class="small muted">${fq(r2(s.onHand*it.cpu))} ${esc(it.cu)}</div>`:''}</td></tr>`)))
+  +rSec('Deliveries waiting to be received','',rTbl(['PO','Supplier','Delivered','Items'],aw.map(o=>`<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(supplier(o.supplierId)?.name||'—')}</td><td>${fd(o.deliveredDate)}</td><td class="small">${itemsBrief(o.items)}</td></tr>`)))
+  +rSec('Items to purchase','',rTbl(['No.','Item','Unit','#BOQ','#Received','#On order','#Left to order'],buy.map(({i,s})=>`<tr><td class="code">${iCode(i)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td class="num">${fq(s.boq)}</td><td class="num">${fq(s.rec)}</td><td class="num">${fq(s.pend)}</td><td class="num"><b>${fq(s.toBuy)}</b></td></tr>`)))};
+function progressAt(d){const m={};[...S.reports].filter(r=>r.date<=d).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).forEach(r=>Object.entries(r.progress).forEach(([k,v])=>m[k]=n(v)));return m}
+RPT.site=P=>{
+  const reps=S.reports.filter(r=>inP(r.date,P)).sort((a,b)=>a.date<b.date?-1:1),m0=progressAt(addDays(P[0],-1)),m1=progressAt(P[1]);
+  const ch=S.citems.map(it=>({it,a:m0[it.id]||0,b:m1[it.id]||0})).filter(x=>x.b!==x.a);
+  const prs=S.prs.filter(p=>p.source==='Site'&&inP(p.date,P));
+  return `<div class="kpis">${rKp('Overall progress',fp(weightedProg(S.citems,m1)),`from ${fp(weightedProg(S.citems,m0))} at the start`,'hero')}${rKp('Site reports',reps.length,'In this period')}${rKp('Average workers',reps.length?Math.round(sum(reps,r=>r.manpower)/reps.length):'—','Per report')}${rKp('Items advanced',ch.length,'Contract BOQ items')}${rKp('Purchase requests',prs.length,'Raised by site')}</div>`
+  +rSec('Progress made','Contract BOQ items that moved in this period',rTbl(['No.','Item','Scope','#Start','#End','Progress'],ch.map(({it,a,b})=>`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td class="small">${esc(scope(it.scopeId)?.name||'')}</td><td class="num">${fq(a)}%</td><td class="num"><b>${fq(b)}%</b></td><td>${bar(b/100)}</td></tr>`)))
+  +rSec('Site reports','',rTbl(['Date','By','Weather','#Workers','Notes'],reps.map(r=>`<tr><td>${fd(r.date)}</td><td>${esc(r.by)}</td><td>${esc(r.weather)}</td><td class="num">${r.manpower}</td><td class="small">${esc(r.notes)}</td></tr>`)))
+  +rSec('Purchase requests from site','',rTbl(['PR','Date','By','Items','Status'],prs.map(p=>`<tr><td class="code"><b>${prNo(p)}</b></td><td>${fd(p.date)}</td><td>${esc(p.by)}</td><td class="small">${itemsBrief(p.items)}</td><td><span class="pill ${PR_CL[p.status]||''}">${PR_LABEL[p.status]||esc(p.status)}</span></td></tr>`)))};
+RPT.qs=P=>{
+  const cl=S.claims.filter(c=>inP(c.date,P)).sort((a,b)=>a.no-b.no),req=S.subs.flatMap(s=>(s.reqs||[]).filter(r=>inP(r.date,P)).map(r=>({s,r}))).sort((a,b)=>a.r.date<b.r.date?-1:1);
+  const ipcC=ipcLinked()?IPC.data.claims.filter(c=>inP(c.date,P)):[];const byC={};if(ipcLinked())IPC.data.contracts.forEach(c=>byC[c.id]=c);
+  const PC={Draft:'warn',Submitted:'info',Approved:'ok'};
+  return `<div class="kpis">${rKp('Progress claims',cl.length,fm(sum(cl,c=>claimNet(c).cur))+' work done','hero')}${rKp('Sub-contract requests',req.length,fm(sum(req,x=>x.r.amount)))}${rKp('Paid to sub-contractors',fm(sum(req.filter(x=>x.r.status==='Paid'),x=>x.r.amount)),'Of these requests')}${ipcLinked()?rKp('IPC system claims',ipcC.length,fm(sum(ipcC.filter(c=>c.status==='approved'),c=>c.current))+' approved'):''}</div>`
+  +rSec('Progress claims to client','',rTbl(['Claim','Valuation date','Status','#Work this period','#Retention','#Net due','Invoice'],cl.map(c=>{const t=claimNet(c),iv=invOfClaim(c.id);return `<tr><td class="code"><b>${ipcNo(c)}</b></td><td>${fd(c.date)}</td><td><span class="pill ${PC[c.status]||''}">${c.status}</span></td><td class="num">${fm(t.cur)}</td><td class="num">${fm(-t.ret)}</td><td class="num"><b>${fm(t.net)}</b></td><td class="code">${iv?invNo(iv):'—'}</td></tr>`})))
+  +rSec('Sub-contract payment requests','',rTbl(['Sub-contractor','Req.','Date','Work covered','#Amount','Status'],req.map(({s,r})=>`<tr><td><b>${esc(s.name)}</b><div class="small muted">${esc(scope(s.scopeId)?.name||'')}</div></td><td class="code">#${r.no}</td><td>${fd(r.date)}</td><td class="small">${esc(r.desc)}${r.by?' · by '+esc(r.by):''}</td><td class="num">${fm(r.amount)}</td><td><span class="pill ${r.status==='Paid'?'ok':'warn'}">${r.status}</span></td></tr>`),req.length?rTot(4,'Total',sum(req,x=>x.r.amount)):''))
+  +(ipcLinked()?rSec('IPC system claims','Read from the IPC system',rTbl(['IPC no.','Sub-contractor','Location','Date','Status','#This claim'],ipcC.map(c=>{const k=byC[c.contractId]||{};return `<tr><td class="code">${esc(c.ipcNo)}</td><td>${esc(k.contractor||'')}</td><td class="small">${esc(k.location||'')}</td><td>${fd(c.date)}</td><td><span class="pill ${IPC_CL[c.status]||''}">${esc(c.status)}</span></td><td class="num">${fm(c.current)}</td></tr>`}))):'')};
+V.rep=()=>{
+  const mine=REPORTS.filter(r=>r[2].split(' ').includes(me.role));
+  if(!mine.length)return ph('Reports','Reports')+'<div class="empty">No reports for your role yet.</div>';
+  if(!mine.find(r=>r[0]===ui.rk))ui.rk=mine[0][0];
+  const P=period(),pr=ui.rp||{t:'this'},name=mine.find(r=>r[0]===ui.rk)[1];
+  const tabs=`<div class="chips">${mine.map(([k,l])=>`<button class="chip ${ui.rk===k?'on':''}" data-act="setF" data-key="rk" data-id="${k}">${l}</button>`).join('')}</div>`;
+  const per=`<div class="chips">${[['last','Last month'],['this','This month'],['next','Next month'],['custom','Custom dates']].map(([k,l])=>`<button class="chip ${pr.t===k?'on':''}" data-act="rpT" data-id="${k}">${l}</button>`).join('')}</div>${pr.t==='custom'?`<input class="in" type="date" id="rpFrom" value="${P[0]}" style="width:auto" aria-label="From date"><span class="muted">to</span><input class="in" type="date" id="rpTo" value="${P[1]}" style="width:auto" aria-label="To date">`:''}`;
+  return ph(esc(S.settings.project)+' · '+fd(P[0])+' – '+fd(P[1]),name,CLOUD?'<button class="btn" data-act="printRep">Print / PDF</button>':'')+`<div class="toolbar no-print">${tabs}</div><div class="toolbar no-print">${per}</div>`+RPT[ui.rk](P)+`<p class="hint" style="margin-top:20px">Prepared by ${esc(me.name)} (${ROLES[me.role]}) on ${fd(today())}.</p>`};
+
+/* ---------- 8. USERS & SETTINGS ---------- */
+
+
+
+V.users=()=>{
+  const rows=S.users.map(u=>`<tr><td><b>${esc(u.name)}</b>${u.id===me.id?' <span class="pill info">You</span>':''}</td><td>${ROLES[u.role]}</td><td class="small muted">${{PM:'Everything',SE:'View all sections without prices (sub-contract amounts shown) · Site Team · sub-contract payment requests',QS:'Internal BOQ · Sub-contracts · Progress Claim',ST:'Stock · issued requests',PC:'Procurement · purchase orders · suppliers',FN:'Invoices · Receivables · Payables · view BOQ, claims, procurement'}[u.role]}</td><td class="act"><button class="lnk" data-act="editUser" data-id="${u.id}">Edit</button>${u.id!==me.id?`<button class="lnk bad" data-act="delUser" data-id="${u.id}">Delete</button>`:''}</td></tr>`).join('');
+  const st=S.settings;
+  return ph('Section 8 · Access control','Users & Settings','<button class="btn pri" data-act="addUser">+ User</button>')+
+  `<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Can use</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="split" style="margin-top:26px"><div class="card"><div class="top"><h2>Project settings</h2><button class="btn sm" data-act="settings">Edit</button></div>
+   <div class="small">Project: <b>${esc(st.project)}</b></div><div class="small">Client: <b>${esc(st.client)}</b></div><div class="small">Contractor: <b>${esc(st.contractor)}</b></div><div class="small">Retention on claims: <b>${n(st.retention)}%</b></div><div class="small">VAT on invoices: <b>${n(st.vat)}%</b></div><div class="small">Client payment term: <b>${n(st.clientDays)} days</b></div></div>
+   <div class="card"><h2>Cloud database</h2>${CLOUD?`<p class="small" style="margin:0"><span class="pill ok">Connected</span> Google Sheets. Changes save automatically. Other users see them within 30 seconds, or when they press Refresh.</p><div class="acts"><button class="btn" data-act="refresh">Refresh now</button></div>`:`<p class="small muted" style="margin:0"><span class="pill">Not connected</span> Data stays in this browser only. To share data between users, paste your Apps Script web app URL into <span class="code">API_URL</span> in the HTML file.</p>`}</div>
+   <div class="card"><h2>Data backup</h2><p class="small muted" style="margin:0">${CLOUD?'Copy all project data as backup text. Restoring a backup replaces all cloud data for every user.':'Data is saved in this browser only. Copy the backup text to keep it safe, or to move it into the cloud version.'}</p><div class="acts"><button class="btn" data-act="copyData">Copy backup</button><button class="btn" data-act="importData">Restore from backup</button><button class="btn danger" data-act="resetData">${CLOUD?'Load sample data':'Reset to sample data'}</button></div></div></div>`;
+};
+
+/* ============ ACTIONS ============ */
+const scopeOpts=()=>S.scopes.map(s=>[s.id,s.name]);
+const delWith=(msg,fn)=>confirmBox(msg,()=>{fn();save();render()});
+const A={
+  close:()=>closeModal(),
+  confirmYes:()=>{const f=pendingYes;pendingYes=null;closeModal();f&&f()},
+  pickUser:d=>{ui.pick=d.id;render();setTimeout(()=>{const p=$('#pin');p&&p.focus()},0)},
+  logout:async()=>{if(CLOUD){if(diff().cnt)await flush();signOutCloud();return}me=null;ui.pick=null;try{sessionStorage.removeItem(KEY+'-u')}catch(e){}render()},
+  retryBoot:()=>bootCloud(),
+  refresh:async()=>{try{if(diff().cnt)await flush();await reloadCloud();loadIpc(true);toast('Up to date')}catch(e){handleErr(e)}},
+  nav:d=>{ui.view=d.v;render();window.scrollTo(0,0)},
+  // contract
+  addScope:()=>form('New scope of work',[{k:'name',l:'Scope name (e.g. Tiling)',req:true,full:true}],v=>{if(!v.name)return'Enter a name';S.scopes.push({id:uid(),name:v.name})}),
+  editScope:d=>{const s=scope(d.id);form('Rename scope',[{k:'name',l:'Scope name',v:s.name,req:true,full:true}],v=>{if(!v.name)return'Enter a name';s.name=v.name})},
+  delScope:d=>{const s=scope(d.id);if(S.citems.some(x=>x.scopeId===s.id)||S.sections.some(x=>x.scopeId===s.id)||S.subs.some(x=>x.scopeId===s.id))return toast('Remove its BOQ items, internal sections and sub-contracts first','bad');delWith(`Delete scope <b>${esc(s.name)}</b>?`,()=>S.scopes=S.scopes.filter(x=>x!==s))},
+  addCItem:d=>cItemForm({scopeId:d.id}),
+  editCItem:d=>cItemForm(citem(d.id)),
+  delCItem:d=>{const it=citem(d.id);if(S.claims.some(c=>n(c.lines[it.id])>0))return toast('This item has claimed quantities and cannot be deleted','bad');delWith(`Delete <b>${esc(it.desc)}</b>?`,()=>S.citems=S.citems.filter(x=>x!==it))},
+  // internal
+  iScope:d=>{ui.iScope=d.id;render()},
+  addSection:()=>{const sc=scope(ui.iScope);const L=String.fromCharCode(65+S.sections.filter(x=>x.scopeId===sc.id).length);form(`New Section ${L} — ${sc.name}`,[{k:'name',l:'Section name (e.g. Materials, Labour)',req:true,full:true}],v=>{if(!v.name)return'Enter a name';S.sections.push({id:uid(),scopeId:sc.id,name:v.name})})},
+  editSection:d=>{const s=section(d.id);form('Rename section',[{k:'name',l:'Section name',v:s.name,req:true,full:true}],v=>{if(!v.name)return'Enter a name';s.name=v.name})},
+  delSection:d=>{const s=section(d.id);if(S.iitems.some(x=>x.sectionId===s.id))return toast('Delete the items in this section first','bad');delWith(`Delete Section ${secLetter(s)} — <b>${esc(s.name)}</b>?`,()=>S.sections=S.sections.filter(x=>x!==s))},
+  addIItem:d=>iItemForm({sectionId:d.id,stock:true}),
+  editIItem:d=>iItemForm(iitem(d.id)),
+  delIItem:d=>{const it=iitem(d.id);if(S.moves.some(m=>m.itemId===it.id)||S.prs.some(p=>p.items.some(i=>i.itemId===it.id)))return toast('This item has stock movements or purchase requests','bad');delWith(`Delete <b>${esc(it.name)}</b>?`,()=>S.iitems=S.iitems.filter(x=>x!==it))},
+  // sub-contracts
+  addSub:()=>subForm({}),
+  editSub:d=>subForm(S.subs.find(x=>x.id===d.id)),
+  delSub:d=>{const s=S.subs.find(x=>x.id===d.id);delWith(`Delete sub-contract <b>${esc(s.name)}</b> and its ${s.reqs.length} payment requests?`,()=>S.subs=S.subs.filter(x=>x!==s))},
+  toggleSub:d=>{ui.subOpen=ui.subOpen===d.id?null:d.id;render()},
+  addReq:d=>{const s=S.subs.find(x=>x.id===d.id);const paid=sum(s.reqs.filter(r=>r.status==='Paid'),r=>r.amount);const pend=sum(s.reqs.filter(r=>r.status==='Requested'),r=>r.amount);
+    form(`Payment request #${s.reqs.length+1} — ${s.name}`,[{k:'date',l:'Date',t:'date',v:today()},{k:'amount',l:`Amount (balance ${fm(n(s.amount)-paid-pend)})`,t:'number',req:true},{k:'desc',l:'Work covered',full:true}],
+    v=>{if(v.amount<=0)return'Enter an amount';if(v.amount>n(s.amount)-paid-pend+0.001)return'Amount is more than the remaining contract balance';s.reqs.push({id:uid(),no:Math.max(0,...s.reqs.map(r=>r.no))+1,date:v.date||today(),desc:v.desc,amount:v.amount,status:'Requested',by:me.name})})},
+  payReq:d=>{const s=S.subs.find(x=>x.id===d.s);const r=s.reqs.find(x=>x.id===d.id);form(`Pay ${fm(r.amount)} to ${s.name} — request #${r.no}`,[{k:'date',l:'Payment date',t:'date',v:today()},{k:'ref',l:'Reference (bank transfer, cheque no.)'}],v=>{r.status='Paid';r.paidDate=v.date||today();r.payRef=v.ref;r.paidBy=me.name;toast('Payment recorded')},'Record payment')},
+  delReq:d=>{const s=S.subs.find(x=>x.id===d.s);delWith('Delete this payment request?',()=>s.reqs=s.reqs.filter(x=>x.id!==d.id))},
+  // claims
+  pickClaim:d=>{ui.claimId=d.id;render()},
+  newClaim:()=>{const no=Math.max(0,...S.claims.map(c=>c.no))+1;form(`New claim — IPC ${String(no).padStart(2,'0')}`,[{k:'date',l:'Valuation date',t:'date',v:today(),full:true}],v=>{const c={id:uid(),no,date:v.date||today(),status:'Draft',lines:{}};S.claims.push(c);ui.claimId=c.id},'Create')},
+  claimStatus:d=>{const c=S.claims.find(x=>x.id===ui.claimId);if(d.s==='Draft'&&invOfClaim(c.id))return toast('This claim is already invoiced and cannot be reopened','bad');if(d.s==='Draft'&&S.claims.some(x=>x.status==='Draft'&&x!==c))return toast('Another claim is already a draft','bad');c.status=d.s;save();render();toast(ipcNo(c)+' marked '+d.s.toLowerCase())},
+  fillClaim:()=>{const c=S.claims.find(x=>x.id===ui.claimId);const R=claimRows(c),pm=progressMap();let k=0;S.citems.forEach(it=>{const target=r2(n(it.qty)*(pm[it.id]||0)/100);const cur=Math.max(0,r2(target-R[it.id].prev));if(cur>0){c.lines[it.id]=cur;k++}else delete c.lines[it.id]});save();render();toast(`Filled ${k} items from latest site progress`)},
+  delClaim:()=>{const c=S.claims.find(x=>x.id===ui.claimId);delWith(`Delete <b>${ipcNo(c)}</b>?`,()=>{S.claims=S.claims.filter(x=>x!==c);ui.claimId=null})},
+  // stock
+  stScope:d=>{ui.stScope=d.id;render()},
+  stMove:d=>{const it=iitem(d.id);const s=stockOf(it.id);
+    if(d.t==='IN'&&!d.force){const ops=S.pos.filter(o=>PO_OPEN(o)&&o.items.some(i=>i.itemId===it.id));
+      if(ops.length){modal(`<h3>Receive ${esc(it.name)}</h3><p class="small muted" style="margin-top:0">This item is on order. Receive it against its purchase order so it is not counted twice.</p><div class="tw"><table><thead><tr><th>PO</th><th>Supplier</th><th class="num">Qty on PO</th><th>Status</th><th></th></tr></thead><tbody>${ops.map(o=>`<tr><td class="code"><b>${poNo(o)}</b></td><td>${esc(supplier(o.supplierId)?.name||'—')}</td><td class="num">${fq(sum(o.items.filter(i=>i.itemId===it.id),i=>i.qty))} ${esc(it.unit)}</td><td><span class="pill ${PO_CL[o.status]}">${PO_LABEL[o.status]}</span></td><td class="act"><button class="btn pri sm" data-act="poReceive" data-id="${o.id}">Receive this PO</button></td></tr>`).join('')}</tbody></table></div><div class="mact"><button class="btn" data-act="stMove" data-t="IN" data-id="${it.id}" data-force="1">Other receipt (not from a PO)</button><button class="btn" data-act="close">Cancel</button></div>`,true);return}}
+    const t={IN:['Receive into stock','Quantity received','Delivery note / PR no.'],OUT:['Issue to site','Quantity issued','Used for (location / work)'],ADJ:['Stock count','Counted on hand','Count remark']}[d.t];
+    form(`${t[0]} — ${it.name}`,[{k:'qty',l:`${t[1]} (${it.unit})${d.t==='ADJ'?' · system shows '+fq(s.onHand):''}`,t:'number',req:true,v:d.t==='ADJ'?s.onHand:''},{k:'date',l:'Date',t:'date',v:today()},{k:'ref',l:t[2],full:true}],v=>{
+      if(d.t!=='ADJ'&&v.qty<=0)return'Enter a quantity above zero';if(d.t==='OUT'&&v.qty>s.onHand+1e-9)return`Only ${fq(s.onHand)} ${it.unit} on hand`;if(d.t==='ADJ'&&v.qty<0)return'Count cannot be negative';
+      const qty=d.t==='ADJ'?r2(v.qty-s.onHand):v.qty;if(d.t==='ADJ'&&!qty)return'Count matches the system — nothing to adjust';
+      S.moves.push({id:uid(),date:v.date||today(),itemId:it.id,type:d.t,qty,ref:v.ref||(d.t==='ADJ'?'Stock count':''),by:me.name})})},
+  newPR:d=>{if(d.src==='Stock'){const pre={};ui.sel.forEach(id=>{const s=stockOf(id);pre[id]=s.toBuy||''});prModal('Stock',pre)}else prModal('Site')},
+  prScope:d=>{prCtx.sc=d.id;prBody()},
+  // procurement
+  procTab:d=>{ui.procTab=d.id;render()},
+  setF:d=>{ui[d.key]=d.id;render()},
+  prOpen:d=>prDetail(d.id),
+  prAccept:d=>{const p=S.prs.find(x=>x.id===d.id);p.status='Received';(p.hist=p.hist||[]).push({s:'Received',date:today(),by:me.name});save();closeModal();render();toast(prNo(p)+' accepted — create a PO when ready')},
+  poNew:d=>poNewModal(d.id),
+  poOpen:d=>poDetail(d.id),
+  rpT:d=>{const P=period();ui.rp={t:d.id,from:P[0],to:P[1]};render()},
+  printRep:()=>window.print(),
+  catOpen:()=>catModal(),
+  pasteItems:async d=>{await getCatalog();pasteItemsModal(section(d.id))},
+  catImport:async()=>{const f=$('#catfile')&&$('#catfile').files[0];let rows=null;const b=$('[data-act=catImport]');b.disabled=true;b.textContent='Reading…';
+    try{rows=f?await sapFromFile(f):parseSap($('#catpaste').value)}catch(e){rows=null}
+    if(!rows||!rows.length){b.disabled=false;b.textContent='Import catalogue';toast('No SAP rows found. The sheet needs the header row with “Item No.”','bad');return}
+    if(CLOUD){b.textContent=`Uploading ${rows.length} items…`;try{await api('catalogImport',{rows})}catch(e){b.disabled=false;b.textContent='Import catalogue';handleErr(e);return}}else lsSet(KEY+'-cat',JSON.stringify(rows));
+    CAT.rows=rows;closeModal();toast(`Catalogue updated: ${rows.length} items`)},
+  ipcOpen:d=>{ui.ipcOpen=ui.ipcOpen===d.id?null:d.id;render()},
+  ipcReload:()=>{loadIpc(true);toast('Reloading from the IPC system…')},
+  ipcPay:d=>{const x=ipcToPay().find(y=>y.cl.id===d.id);if(!x)return;payForm(`Pay ${x.cl.ipcNo} — ${x.c.contractor}`,x.bal,y=>{S.ipcpay.push({id:y.id,claimId:x.cl.id,ipcNo:x.cl.ipcNo,work:ipcWorkName(x.c.work),contractor:x.c.contractor,location:x.c.location,amount:y.amount,date:y.date,ref:y.ref,by:y.by})})},
+  poReceive:d=>{closeModal();poReceive(d.id)},
+  delMove:d=>{const mv=S.moves.find(x=>x.id===d.id),it=iitem(mv.itemId);delWith(`Delete this stock entry: ${({IN:'received',OUT:'issued',ADJ:'count adjustment'})[mv.type]} ${fq(mv.qty)} ${esc(it?it.unit:'')} of <b>${esc(it?it.name:'item')}</b> on ${fd(mv.date)}?`,()=>S.moves=S.moves.filter(x=>x!==mv))},
+  poAdvance:d=>{poAdvance(po(d.id));closeModal();render()},
+  poCancel:d=>{const o=po(d.id);if(paidOf(o)>0)return toast('This PO already has payments. Ask Finance before cancelling.','bad');confirmBox(`Cancel ${poNo(o)}? Its items go back to the purchase request so a new PO can be made.`,()=>{o.status='Cancelled';(o.hist=o.hist||[]).push({s:'Cancelled',date:today(),by:me.name});const p=S.prs.find(x=>x.id===o.prId);if(p){p.items.forEach(i=>{if(i.poId===o.id)delete i.poId});p.status=p.items.some(i=>i.poId)?'Part ordered':'Received'}save();render()},'Cancel PO')},
+  poPayNew:d=>{const o=po(d.id);payForm(`Pay ${poNo(o)} — ${supplier(o.supplierId)?.name||''}`,poPay(o).bal,y=>{(o.payments=o.payments||[]).push(y)})},
+  invNew:d=>{const c=S.claims.find(x=>x.id===d.id),t=claimNet(c),st=S.settings,no=Math.max(0,...S.invoices.map(i=>n(i.no)))+1;
+    form(`Invoice INV-${String(no).padStart(3,'0')} for ${ipcNo(c)}`,[{k:'date',l:'Invoice date',t:'date',v:today()},{k:'due',l:`Due date (client term ${n(st.clientDays)} days)`,t:'date',v:addDays(today(),st.clientDays)},{k:'amount',l:'Amount before VAT (net of retention)',t:'number',v:r2(t.net)},{k:'vat',l:'VAT %',t:'number',v:n(st.vat)},{k:'note',l:'Note',full:true}],
+    v=>{if(v.amount<=0)return'Enter the invoice amount';if(invOfClaim(c.id))return'This claim already has an invoice';S.invoices.push({id:uid(),no,claimId:c.id,date:v.date||today(),dueDate:v.due||addDays(v.date||today(),st.clientDays),amount:r2(v.amount),vat:v.vat,payments:[],note:v.note});toast('Invoice issued')},'Issue invoice')},
+  invOpen:d=>{const i=S.invoices.find(x=>x.id===d.id),c=S.claims.find(x=>x.id===i.claimId),p=invPay(i);const pays=(i.payments||[]).map(y=>`<tr><td>${fd(y.date)}</td><td class="small">${esc(y.ref)}</td><td class="num">${fm(y.amount)}</td></tr>`).join('');
+    modal(`<h3>${invNo(i)} <span class="pill ${p.tag[1]}" style="vertical-align:middle">${p.tag[0]}</span></h3><div class="ipc-head"><div><div class="l">Client</div><div class="v">${esc(S.settings.client)}</div></div><div><div class="l">Claim</div><div class="v">${c?ipcNo(c)+' · '+fd(c.date):'—'}</div></div><div><div class="l">Invoice date</div><div class="v">${fd(i.date)}</div></div><div><div class="l">Due date</div><div class="v">${fd(i.dueDate)}</div></div></div>
+    <div class="summ"><div>Amount (net of retention)</div><div class="num">${fm(i.amount)}</div><div>VAT ${n(i.vat)}%</div><div class="num">${fm(p.amt-n(i.amount))}</div><div>Invoice total</div><div class="num">${fm(p.amt)}</div><div>Less received</div><div class="num">${fm(-p.paid)}</div><div class="net">Balance due</div><div class="num net">${fm(p.bal)}</div></div>
+    ${i.note?`<p class="small">${esc(i.note)}</p>`:''}
+    <div class="sec"><h2>Payments received</h2>${pays?`<div class="tw"><table><thead><tr><th>Date</th><th>Reference</th><th class="num">Amount</th></tr></thead><tbody>${pays}</tbody></table></div>`:'<p class="small muted" style="margin:0">No payments yet.</p>'}</div>
+    <div class="mact">${PAY()&&!(i.payments||[]).length?`<button class="btn danger" data-act="invDel" data-id="${i.id}">Delete invoice</button>`:''}<button class="btn" data-act="close">Close</button>${PAY()&&p.bal>0.004?`<button class="btn pri" data-act="invPayNew" data-id="${i.id}">Record payment</button>`:''}</div>`,true)},
+  invPayNew:d=>{const i=S.invoices.find(x=>x.id===d.id);payForm(`Payment received — ${invNo(i)}`,invPay(i).bal,y=>{(i.payments=i.payments||[]).push(y)})},
+  invDel:d=>{const i=S.invoices.find(x=>x.id===d.id);delWith(`Delete <b>${invNo(i)}</b>? Its claim goes back to “ready to invoice”.`,()=>S.invoices=S.invoices.filter(x=>x!==i))},
+  prCancel:d=>{const p=S.prs.find(x=>x.id===d.id);confirmBox(`Cancel ${prNo(p)}? Stock will no longer count it as on order.`,()=>{p.status='Cancelled';p.hist.push({s:'Cancelled',date:today(),by:me.name});save();render()},'Cancel request')},
+  addSupplier:()=>supForm({}),
+  editSupplier:d=>supForm(supplier(d.id)),
+  delSupplier:d=>{const s=supplier(d.id);if(S.pos.some(o=>o.supplierId===s.id))return toast('This supplier has purchase orders and cannot be deleted','bad');delWith(`Delete supplier <b>${esc(s.name)}</b>?`,()=>S.suppliers=S.suppliers.filter(x=>x!==s))},
+  // site
+  siteTab:d=>{ui.siteTab=d.id;render()},
+  newReport:()=>reportModal(),
+  viewReport:d=>{const r=S.reports.find(x=>x.id===d.id);const rows=Object.entries(r.progress).map(([k,v])=>{const it=citem(k);return it?`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}<div class="small muted">${esc(scope(it.scopeId)?.name||'')}</div></td><td>${bar(v/100)}</td></tr>`:''}).join('');
+    modal(`<h3>Site report — ${fd(r.date)}</h3><p class="small muted">By ${esc(r.by)} · ${esc(r.weather)} · ${r.manpower} workers</p><p>${esc(r.notes)}</p>${rows?`<div class="tw"><table><thead><tr><th>No.</th><th>Item</th><th>Reported %</th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No progress figures in this report.</div>'}<div class="mact"><button class="btn" data-act="close">Close</button></div>`,true)},
+  delReport:d=>delWith('Delete this site report? Progress figures from it will be removed.',()=>S.reports=S.reports.filter(x=>x.id!==d.id)),
+  // users
+  addUser:()=>userForm({}),
+  editUser:d=>userForm(S.users.find(x=>x.id===d.id)),
+  delUser:d=>{const u=S.users.find(x=>x.id===d.id);delWith(`Delete user <b>${esc(u.name)}</b>?`,()=>S.users=S.users.filter(x=>x!==u))},
+  settings:()=>{const st=S.settings;form('Project settings',[{k:'project',l:'Project name',v:st.project,full:true},{k:'client',l:'Client',v:st.client},{k:'contractor',l:'Contractor',v:st.contractor},{k:'retention',l:'Retention % on claims',t:'number',v:st.retention},{k:'vat',l:'VAT % on invoices',t:'number',v:st.vat},{k:'clientDays',l:'Client payment term (days)',t:'number',v:st.clientDays}],v=>{if(!v.project)return'Enter a project name';Object.assign(st,v)})},
+  copyData:()=>{const txt=JSON.stringify(S);const done=()=>toast('Backup copied — paste it into a text file');
+    try{navigator.clipboard.writeText(txt).then(done,()=>showBackup(txt))}catch(e){showBackup(txt)}},
+  importData:()=>{modal(`<h3>Restore from backup</h3>${CLOUD?'<p class="small" style="color:var(--bad)">This replaces all data in the cloud database for every user. Everyone will need to sign in again.</p>':''}<form id="imf" class="fgrid"><label class="f full" for="imt">Paste backup text<textarea class="in" id="imt" rows="8"></textarea></label><label class="f full" for="imfile">…or choose a backup file<input class="in" id="imfile" type="file" accept=".json,.txt,application/json,text/plain"></label><div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Restore</button></div></form>`);
+    $('#imfile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>$('#imt').value=r.result;r.readAsText(f)};
+    $('#imf').onsubmit=async e=>{e.preventDefault();let d;try{d=JSON.parse($('#imt').value);if(!d.scopes||!d.users)throw 0}catch(err){toast('That text is not a valid backup','bad');return}
+      if(CLOUD){const b=e.target.querySelector('.pri');b.disabled=true;b.textContent='Uploading…';try{await api('import',{data:d});closeModal();signOutCloud('Backup restored to the cloud. Please sign in again.')}catch(err){b.disabled=false;b.textContent='Restore';handleErr(err)}return}
+      S=migrate(d);me=S.users.find(u=>u.id===me.id)||null;save();closeModal();render();toast('Backup restored')}},
+  resetData:()=>confirmBox(CLOUD?'Replace ALL cloud data with the sample project? Every user loses what was entered. Sample PINs are 1234.':'Replace all data with the sample project? Everything entered so far will be lost.',async()=>{
+    if(CLOUD){try{await api('import',{data:seed()});signOutCloud('Sample data loaded. Sign in as Sithy with PIN 1234.')}catch(e){handleErr(e)}return}
+    S=migrate(seed());me=S.users[0];save();render();toast('Sample data loaded')},CLOUD?'Replace cloud data':'Reset'),
+};
+function showBackup(txt){modal(`<h3>Backup text</h3><p class="small muted">Select all and copy this text into a file.</p><textarea class="in" rows="10" id="bk" readonly>${esc(txt)}</textarea><div class="mact"><button class="btn" data-act="close">Close</button></div>`);const b=$('#bk');b.focus();b.select()}
+function cItemForm(it){const isNew=!it.id;form(isNew?'New Contract BOQ item':'Edit Contract BOQ item',[{k:'scopeId',l:'Scope of work',t:'select',o:scopeOpts(),v:it.scopeId,full:true},{k:'desc',l:'Description',v:it.desc,req:true,full:true},{k:'unit',l:'Unit',v:it.unit||'m2'},{k:'qty',l:'Quantity',t:'number',v:it.qty??''},{k:'rate',l:'Unit rate (USD)',t:'number',v:it.rate??'',full:true}],
+  v=>{if(!v.desc)return'Enter a description';if(v.qty<=0)return'Quantity must be above zero';if(isNew)S.citems.push({id:uid(),...v});else Object.assign(it,v)})}
+function iItemForm(it){const isNew=!it.id;const sec=section(it.sectionId);form((isNew?'New item in ':'Edit item in ')+`Section ${secLetter(sec)} — ${sec.name}`,[{k:'code',l:'SAP / system code (optional — fills the rest from the item catalogue)',v:it.code||'',full:true},{k:'name',l:'Item name',v:it.name,req:true,full:true},{k:'unit',l:'Stock unit (e.g. pcs)',v:it.unit||'pcs'},{k:'qty',l:'Quantity in stock units',t:'number',v:it.qty??''},{k:'cu',l:'Priced per (blank = per stock unit; e.g. kg, m2)',v:it.cu||''},{k:'cpu',l:'Priced units in 1 stock unit (e.g. kg per pcs)',t:'number',v:it.cpu||''},{k:'rate',l:'Unit price (USD per priced unit)',t:'number',v:it.rate??''},{k:'stock',l:'Track in stock',t:'select',o:[['yes','Yes — material'],['no','No — labour / service']],v:it.stock===false?'no':'yes'}],
+  v=>{if(!v.name)return'Enter an item name';if(v.qty<=0)return'Quantity must be above zero';if(v.cu&&v.cpu<=0)return`Enter how many ${v.cu} are in 1 ${v.unit||'unit'}`;if(!v.cu)v.cpu=0;v.stock=v.stock==='yes';if(isNew)S.iitems.push({id:uid(),sectionId:sec.id,...v});else Object.assign(it,v)});catHook()}
+const ipcIdOf=v=>{const s=String(v||'').trim();const m=s.match(/\/d\/([\w-]+)/);return m?m[1]:s};
+function samplePeek(id,pf){const d=sampleIpc(),cs=d.contracts.filter(c=>c.src===id&&ipcProjOk({ipcProject:pf},c));if(!cs.length)return d.contracts.some(c=>c.src===id)?{name:id,contractors:[]}:{err:'The browser-only version can only read the sample IPC Sheets “demo-tile” and “demo-plaster”.'};
+  const by={};cs.forEach(c=>{const x=by[c.contractor]=by[c.contractor]||{contractor:c.contractor,n:0,value:0};x.n++;x.value=r2(x.value+c.contractValue)});return{name:(d.works.find(w=>w.id===cs[0].work)||{}).name||id,contractors:Object.values(by)}}
+function subForm(s){const isNew=!s.id;
+  modal(`<h3>${isNew?'New sub-contract':'Edit sub-contract'}</h3><form id="sbf" class="fgrid">${field({k:'scopeId',l:'Scope of work',t:'select',o:scopeOpts(),v:s.scopeId,full:true})}
+  ${field({k:'ipc',l:'IPC system Google Sheet for this scope (link or ID — optional)',v:s.ipcSheetId||'',full:true})}${field({k:'ipcProject',l:'IPC project filter (optional — part of the project name or code, e.g. Anajak)',v:s.ipcProject||'',full:true})}<div class="full" id="ipcpick"></div>
+  ${field({k:'name',l:'Sub-contractor name',v:s.name,req:true})}${field({k:'phone',l:'Phone',v:s.phone})}${field({k:'amount',l:'Total contract amount (USD)',t:'number',v:s.amount??'',full:true})}
+  <p class="hint full">With an IPC link, requests and approvals are made in the IPC system and this sub-contract shows its claims. Without one, payment requests are made here.</p>
+  <div class="mact"><button type="button" class="btn" data-act="close">Cancel</button><button class="btn pri">Save</button></div></form>`);
+  let picked=s.ipcContractor||'',list=null;
+  const draw=()=>{const box=$('#ipcpick');if(!box)return;if(!list){box.innerHTML='';return}
+    if(list.err){box.innerHTML=`<div class="small" style="color:var(--bad)">${esc(list.err)}</div>`;return}
+    box.innerHTML=`<label class="f" for="f_ipcc">IPC contract in “${esc(list.name)}”<select class="in" id="f_ipcc"><option value="">— choose the contractor —</option>${list.contractors.map(c=>`<option value="${esc(c.contractor)}" ${c.contractor===picked?'selected':''}>${esc(c.contractor)} · ${c.n} house${pl(c.n)} · ${fm(c.value)}</option>`).join('')}</select></label>${list.contractors.length?'':'<div class="small muted">No contracts found in this Sheet yet.</div>'}`;
+    $('#f_ipcc').onchange=e=>{picked=e.target.value;const c=list.contractors.find(x=>x.contractor===picked);if(c){$('#f_name').value=c.contractor;$('#f_amount').value=c.value}}};
+  let lastId=null;
+  const peek=async()=>{const id=ipcIdOf($('#f_ipc').value),pf=$('#f_ipcProject').value.trim(),key=id+'|'+pf;if(key===lastId)return;lastId=key;if(!id){list=null;draw();return}$('#ipcpick').innerHTML='<div class="small muted">Reading the IPC Sheet…</div>';
+    try{list=CLOUD?await api('ipcPeek',{sheetId:id,filter:pf}):samplePeek(id,pf)}catch(e){list={err:e.message}}draw()};
+  $('#f_ipc').addEventListener('change',peek);$('#f_ipcProject').addEventListener('change',peek);if(s.ipcSheetId)peek();
+  $('#sbf').onsubmit=async e=>{e.preventDefault();
+    const v={scopeId:$('#f_scopeId').value,name:$('#f_name').value.trim(),phone:$('#f_phone').value.trim(),amount:n($('#f_amount').value),ipcSheetId:ipcIdOf($('#f_ipc').value),ipcProject:$('#f_ipcProject').value.trim(),ipcContractor:''};
+    if(v.ipcSheetId){if(!picked){toast('Choose the IPC contract (contractor) for this sub-contract','bad');return}v.ipcContractor=picked}
+    if(!v.name){toast('Enter the sub-contractor name','bad');return}if(v.amount<=0){toast('Enter the contract amount','bad');return}
+    const relink=v.ipcSheetId&&(v.ipcSheetId!==(s.ipcSheetId||'')||v.ipcContractor!==(s.ipcContractor||'')||v.ipcProject!==(s.ipcProject||''));
+    if(isNew)S.subs.push({id:uid(),reqs:[],...v});else Object.assign(s,v);save();closeModal();render();
+    if(relink){if(CLOUD&&diff().cnt)await flush();loadIpc(true)}}}
+function supForm(s){const isNew=!s.id;form(isNew?'New supplier':'Edit supplier',[{k:'name',l:'Supplier name',v:s.name,req:true,full:true},{k:'contact',l:'Contact person',v:s.contact},{k:'phone',l:'Phone number',v:s.phone},{k:'days',l:'Credit term in days (0 = cash on delivery)',t:'number',v:s.days??30},{k:'category',l:'Supplies',v:s.category}],
+  v=>{if(!v.name)return'Enter the supplier name';if(v.days<0)return'Credit days cannot be negative';v.credit=termLabel(v.days);if(isNew)S.suppliers.push({id:uid(),...v});else Object.assign(s,v)})}
+function userForm(u){const isNew=!u.id;form(isNew?'New user':'Edit user',[{k:'name',l:'Name',v:u.name,req:true},{k:'role',l:'Role',t:'select',o:Object.entries(ROLES),v:u.role||'SE'},{k:'pin',l:isNew?'PIN':'New PIN (leave blank to keep)',t:'password',v:'',full:true}],
+  v=>{if(!v.name)return'Enter a name';if(isNew&&!v.pin)return'Set a PIN';if(!isNew&&u.id===me.id&&v.role!=='PM')return'You cannot remove your own Project Manager role';
+    if(isNew)S.users.push({id:uid(),...v});else{u.name=v.name;u.role=v.role;if(v.pin)u.pin=v.pin}})}
+
+/* ============ EVENTS ============ */
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const f=A[b.dataset.act];if(f){e.preventDefault();f(b.dataset,e)}});
+$('#ov').addEventListener('mousedown',e=>{if(e.target.id==='ov')closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#ov').hidden)closeModal()});
+document.addEventListener('submit',async e=>{if(e.target.id!=='lf')return;e.preventDefault();
+  if(CLOUD){const b=e.target.querySelector('button');b.disabled=true;b.textContent='Signing in…';
+    try{const r=await api('login',{userId:ui.pick,pin:$('#pin').value});C.token=r.token;me={id:r.user.id};lsSet(KEY+'-tok',r.token);lsSet(KEY+'-uid',r.user.id);ui.view='dash';await reloadCloud();loadIpc()}
+    catch(err){b.disabled=false;b.textContent='Sign in';toast(err.message,'bad')}return}
+  const u=S.users.find(x=>x.id===ui.pick);if(u&&$('#pin').value===String(u.pin)){me=u;try{sessionStorage.setItem(KEY+'-u',u.id)}catch(err){}ui.view='dash';render()}else toast('Wrong PIN','bad')});
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.dataset.cq){const c=S.claims.find(x=>x.id===ui.claimId);if(!c||c.status!=='Draft')return;const v=n(t.value);if(v>0)c.lines[t.dataset.cq]=v;else delete c.lines[t.dataset.cq];save();updClaimRow(t.dataset.cq)}
+  else if(t.dataset.pq){prCtx.tmp[t.dataset.pq]=t.value;t.classList.toggle('over',n(t.value)>stockOf(t.dataset.pq).toBuy+1e-9);const c=Object.values(prCtx.tmp).filter(q=>n(q)>0).length;const el=$('#prcnt');if(el)el.textContent=`${c} item${c===1?'':'s'} in request`}
+  else if(t.id==='stq'){ui.stQ=t.value;const pos=t.selectionStart;render();const s=$('#stq');if(s){s.focus();s.setSelectionRange(pos,pos)}}});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.sel){t.checked?ui.sel.add(t.dataset.sel):ui.sel.delete(t.dataset.sel);render()}
+  else if(t.id==='rpFrom'||t.id==='rpTo'){ui.rp=Object.assign({},ui.rp,{t:'custom',[t.id==='rpFrom'?'from':'to']:t.value});render()}});
+
+if(CLOUD){
+  bootCloud();
+  setInterval(poll,30000);
+  document.addEventListener('visibilitychange',poll);
+  window.addEventListener('beforeunload',e=>{if(C.token&&(C.sending||C.timer||diff().cnt)){e.preventDefault();e.returnValue=''}});
+}else{S=migrate(load()||seed());try{const u=sessionStorage.getItem(KEY+'-u');me=S.users.find(x=>x.id===u)||null}catch(e){}loadIpc();render()}
+</script>
+
+</body>
+</html>
