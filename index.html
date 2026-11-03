@@ -104,6 +104,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:#F7F9F6}
 .work{padding:10px 0;border-bottom:1px solid #EEF1EE}.work:last-child{border-bottom:0}
 .wt{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}.wt b{font-weight:500}
 .wb{display:flex;gap:6px}
+.code{font-family:ui-monospace,Menlo,monospace;background:#EEF1EE;padding:1px 5px;border-radius:4px;font-size:12px;word-break:break-all}
 .syncnote{background:var(--blue-soft);color:#1B4A80;padding:6px 10px;border-radius:6px;margin-bottom:10px}
 .wr{display:grid;grid-template-columns:1fr 44px auto;gap:10px;align-items:center}.wr input[type=range]{width:100%;accent-color:var(--green)}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30}
@@ -285,12 +286,15 @@ function progress(u){ const W=u.works||[]; const tw=W.reduce((a,w)=>a+Number(w.w
 function budget(u){ return (u.works||[]).reduce((a,w)=>a+Number(w.budget||0),0); }
 function contractors(u){ return [...new Set((u.works||[]).map(w=>w.contractor).filter(Boolean))]; }
 function statusIdx(u){ if(u.handedOver) return 3; const p=progress(u); return p>=100?2:p>0?1:0; }
+function appBase(){ return location.origin+location.pathname.replace(/[^/]*$/,""); }
 function houseApp(u){
-  if(u.appUrl) return String(u.appUrl).trim();
-  const t=String((S.project||{}).appUrl||"").trim(); if(!t) return "";
-  return t.replace(/\{house\}/gi,encodeURIComponent(u.id)).replace(/\{file\}/gi,encodeURIComponent(u.file||""));
+  if(u.appUrl) return String(u.appUrl).trim();                       // per-house override
+  const t=String((S.project||{}).appUrl||"").trim();
+  if(t) return t.replace(/\{house\}/gi,encodeURIComponent(u.id)).replace(/\{file\}/gi,encodeURIComponent(u.file||""));
+  // default: <house>.html beside this page, e.g. .../lvilla1/E12.html
+  if(location.protocol==="http:"||location.protocol==="https:") return appBase()+encodeURIComponent(u.id)+".html";
+  return "";
 }
-function houseSheet(u){ return u.file?("https://docs.google.com/spreadsheets/d/"+u.file+"/edit"):""; }
 function openExt(url){ if(!url) return; window.open(url,"_blank","noopener"); }
 function isSync(u){ return (typeof u==="string"?(S.units.find(x=>x.id===u)||{}):u).src==="sync"; }
 function used(id,wid){ const u=S.units.find(x=>x.id===id);
@@ -386,7 +390,7 @@ function units(){
     <select onchange="filt.status=this.value;render()"><option value="">គ្រប់ស្ថានភាព</option>${STATUS.map((s,i)=>`<option value="${i}" ${filt.status==i?"selected":""}>${s}</option>`).join("")}</select>
   </div>
   <div class="card" style="padding:0 6px">${L.length?`<table><tr><th>លេខ</th><th class="hide-m">ប្រភេទ</th><th>វឌ្ឍនភាព</th><th>ស្ថានភាព</th><th class="hide-m">អ្នកម៉ៅការ</th><th class="hide-m" style="text-align:right">ថវិកា</th><th style="text-align:right">នៅសល់</th><th></th></tr>
-  ${L.map(u=>{const p=progress(u),si=statusIdx(u);return `<tr class="click" onclick="openUnit('${u.id}')"><td><b>${u.id}</b>${isSync(u)?' <span class="tag info" title="ទាញពីឯកសារផ្ទះ">⇄</span>':""}</td><td class="hide-m">${esc(u.type)}</td><td><div class="row" style="gap:8px"><div class="bar ${si===1?"a":""}" style="flex:1"><i style="width:${p}%"></i></div><span class="pct">${p}%</span></div></td><td><span class="tag s${si}">${STATUS[si]}</span></td><td class="hide-m mini">${esc(contractors(u).join(", "))||"—"}</td><td class="hide-m" style="text-align:right;font-variant-numeric:tabular-nums">${budget(u)?money(budget(u)):"—"}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:${remain(u)<0?"var(--red)":"inherit"}">${budget(u)?money(remain(u)):"—"}</td><td style="text-align:right;white-space:nowrap">${(houseApp(u)||houseSheet(u))?`<button class="btn sm" title="បើកកម្មវិធីសំណង់" onclick="event.stopPropagation();openExt('${esc(houseApp(u)||houseSheet(u))}')">↗</button> `:""}<button class="btn sm ed" onclick="event.stopPropagation();openUnitForm('${u.id}')">កែ</button></td></tr>`}).join("")}</table>`:`<div class="empty"><b>រកមិនឃើញផ្ទះ</b>ប្តូរតម្រង ឬបន្ថែមផ្ទះថ្មី</div>`}</div>`;
+  ${L.map(u=>{const p=progress(u),si=statusIdx(u);return `<tr class="click" onclick="openUnit('${u.id}')"><td><b>${u.id}</b>${isSync(u)?' <span class="tag info" title="ទាញពីឯកសារផ្ទះ">⇄</span>':""}</td><td class="hide-m">${esc(u.type)}</td><td><div class="row" style="gap:8px"><div class="bar ${si===1?"a":""}" style="flex:1"><i style="width:${p}%"></i></div><span class="pct">${p}%</span></div></td><td><span class="tag s${si}">${STATUS[si]}</span></td><td class="hide-m mini">${esc(contractors(u).join(", "))||"—"}</td><td class="hide-m" style="text-align:right;font-variant-numeric:tabular-nums">${budget(u)?money(budget(u)):"—"}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:${remain(u)<0?"var(--red)":"inherit"}">${budget(u)?money(remain(u)):"—"}</td><td style="text-align:right;white-space:nowrap">${houseApp(u)?`<button class="btn sm" title="បើកកម្មវិធីគ្រប់គ្រងសំណង់" onclick="event.stopPropagation();openExt('${esc(houseApp(u))}')">↗</button> `:""}<button class="btn sm ed" onclick="event.stopPropagation();openUnitForm('${u.id}')">កែ</button></td></tr>`}).join("")}</table>`:`<div class="empty"><b>រកមិនឃើញផ្ទះ</b>ប្តូរតម្រង ឬបន្ថែមផ្ទះថ្មី</div>`}</div>`;
 }
 
 function issues(){
@@ -445,8 +449,8 @@ function settings(){
     <div class="f2"><div class="f"><label>ឈ្មោះបូរី</label><input id="p_name" value="${esc(p.name)}"></div><div class="f"><label>ទីតាំង</label><input id="p_loc" value="${esc(p.location)}"></div>
     <div class="f"><label>ថ្ងៃចាប់ផ្តើម</label><input type="date" id="p_start" value="${p.start}"></div><div class="f"><label>ថ្ងៃបញ្ចប់គោលដៅ</label><input type="date" id="p_end" value="${p.end}"></div>
     <div class="f"><label>អ្នកគ្រប់គ្រងគម្រោង</label><input id="p_pm" value="${esc(p.pm)}"></div></div>
-    <div class="f"><label>តំណកម្មវិធីគ្រប់គ្រងសំណង់ (template)</label><input id="p_app" value="${esc(p.appUrl||"")}" placeholder="https://…/index.html?house={house}"></div>
-    <p class="mini" style="margin:-6px 0 12px"><b>{house}</b> = លេខផ្ទះ · <b>{file}</b> = Google Sheet ID របស់ផ្ទះ។ ទុកទទេ ប្រសិនបើប្រើតែតំណ Google Sheet។</p>
+    <div class="f"><label>តំណកម្មវិធីគ្រប់គ្រងសំណង់ (template)</label><input id="p_app" value="${esc(p.appUrl||"")}" placeholder="${esc(appBase())}{house}.html"></div>
+    <p class="mini" style="margin:-6px 0 12px"><b>{house}</b> = លេខផ្ទះ · <b>{file}</b> = Google Sheet ID។ ទុកទទេ = ប្រើឯកសារក្បែរទំព័រនេះ៖ <span class="code">${esc(appBase())}&lt;លេខផ្ទះ&gt;.html</span></p>
     <button class="btn pri" onclick="saveProject()">រក្សាទុក</button></div>
   <div class="card"><h2 style="margin-bottom:8px">ទិន្នន័យ</h2><p class="mini" style="margin-bottom:12px">ទិន្នន័យរក្សាទុកក្នុង browser នេះ។ នាំចេញជាទៀងទាត់ ឬភ្ជាប់ Google Sheets តាម CONFIG.API_URL ក្នុងកូដ។</p>
     <div class="row"><button class="btn" onclick="exportJSON()">នាំចេញ JSON</button><button class="btn ed" onclick="importJSON()">នាំចូល JSON</button><button class="btn" onclick="exportCSV()">នាំចេញ CSV ការងារ</button><button class="btn danger" onclick="resetAll()">លុបទាំងអស់</button></div></div>`;
@@ -464,9 +468,8 @@ function openUnit(id){
   openModal(`<div class="unithead"><h2>ផ្ទះ ${u.id}</h2><span class="tag s${si}">${STATUS[si]}</span></div>
   <p class="mini" style="margin-bottom:12px">${esc(u.type)} · ប្លុក ${u.block} ${u.sold?"· បានលក់":""}${u.note?" · "+esc(u.note):""}</p>
   ${isSync(u)?`<p class="mini syncnote">⇄ ទាញពីឯកសារផ្ទះ · ${esc(u.syncedAt||"")} — ការងារ និងថវិកាអានប៉ុណ្ណោះ (ព័ត៌មានផ្ទះកែបាន)</p>`:""}
-  ${(houseApp(u)||houseSheet(u))?`<div class="row" style="gap:8px;margin-bottom:12px">
-    ${houseApp(u)?`<button class="btn pri" onclick="openExt('${esc(houseApp(u))}')">↗ បើកកម្មវិធីគ្រប់គ្រងសំណង់</button>`:""}
-    ${houseSheet(u)?`<button class="btn" onclick="openExt('${esc(houseSheet(u))}')">↗ បើក Google Sheet</button>`:""}
+  ${houseApp(u)?`<div class="row" style="margin-bottom:12px">
+    <button class="btn pri" onclick="openExt('${esc(houseApp(u))}')">↗ បើកកម្មវិធីគ្រប់គ្រងសំណង់ ${esc(u.id)}</button>
   </div>`:""}
   <div class="row" style="margin-bottom:8px"><div class="bar" style="flex:1"><i style="width:${progress(u)}%"></i></div><b id="u_prog">${progress(u)}%</b></div>
   <div class="kpis" style="margin-bottom:12px"><div class="kpi"><b style="font-size:20px">${money(budget(u))}</b><span>ថវិកាសរុប</span></div><div class="kpi warn"><b style="font-size:20px">${money(used(id))}</b><span>បានប្រើ (បានទូទាត់)</span></div><div class="kpi ${remain(u)<0?"bad":"good"}"><b style="font-size:20px">${money(remain(u))}</b><span>នៅសល់</span></div></div>
