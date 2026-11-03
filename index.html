@@ -163,6 +163,7 @@ const STAGES = [
   ["foundation","គ្រឹះ",15],["structure","គ្រោងឆ្អឹង",25],["masonry","ជញ្ជាំង",15],
   ["roof","ដំបូល",10],["mep","ទឹក-ភ្លើង",10],["finish","តុបតែង/លាបថ្នាំ",20],["handover","ត្រួតពិនិត្យ/ប្រគល់",5]
 ];
+/* starting suggestions only — any text can be typed, and whatever you use is suggested next time */
 const TYPES = ["វីឡាប្រណិត A (8×12m)","វីឡាប្រណិត A+ (8×12m)","វីឡាប្រណិត B (8×12m)","វីឡាប្រណិត B+ (8×12m)","Emperor Villa (11×26m)"];
 const PRIO = ["ទាប","មធ្យម","ខ្ពស់"];
 const ISTATUS = ["បើក","កំពុងដោះស្រាយ","បានបិទ"];
@@ -287,6 +288,11 @@ function budget(u){ return (u.works||[]).reduce((a,w)=>a+Number(w.budget||0),0);
 function contractors(u){ return [...new Set((u.works||[]).map(w=>w.contractor).filter(Boolean))]; }
 function statusIdx(u){ if(u.handedOver) return 3; const p=progress(u); return p>=100?2:p>0?1:0; }
 function appBase(){ return location.origin+location.pathname.replace(/[^/]*$/,""); }
+function typeList(){ return [...new Set(S.units.map(u=>u.type).concat(TYPES))].filter(Boolean).sort(); }
+function typeField(id,val){
+  return `<input id="${id}" value="${esc(val||"")}" list="typeOpts" placeholder="សរសេរដោយសេរី ឬជ្រើសពីបញ្ជី">
+    <datalist id="typeOpts">${typeList().map(t=>`<option value="${esc(t)}">`).join("")}</datalist>`;
+}
 function houseApp(u){
   if(u.appUrl) return String(u.appUrl).trim();                       // per-house override
   const t=String((S.project||{}).appUrl||"").trim();
@@ -527,7 +533,7 @@ function openUnitForm(id){ if(!guard()) return;
   const u=id?S.units.find(x=>x.id===id):{id:"",block:blocks()[0]||"A",type:TYPES[0],sold:false,note:"",appUrl:""};
   openModal(`<h2>${id?"កែព័ត៌មានផ្ទះ":"បន្ថែមផ្ទះ"}</h2>
   <div class="f2"><div class="f"><label>លេខផ្ទះ</label><input id="u_id" value="${esc(u.id)}" placeholder="D5" ${id&&isSync(id)?"readonly title='មកពីឈ្មោះឯកសារផ្ទះ'":""}></div><div class="f"><label>ប្លុក</label><input id="u_block" value="${esc(u.block)}"></div>
-  <div class="f"><label>ប្រភេទ</label><select id="u_type">${opts(TYPES,u.type)}</select></div></div>
+  <div class="f"><label>ប្រភេទ</label>${typeField("u_type",u.type)}</div></div>
   <div class="f"><label><input type="checkbox" id="u_sold" ${u.sold?"checked":""}> បានលក់</label></div>
   <div class="f"><label>កំណត់ចំណាំ</label><textarea id="u_note" rows="2">${esc(u.note)}</textarea></div>
   <div class="f"><label>តំណកម្មវិធីសំណង់សម្រាប់ផ្ទះនេះ (ស្រេចចិត្ត)</label><input id="u_app" value="${esc(u.appUrl||"")}" placeholder="ទុកទទេ = ប្រើ template ក្នុងការកំណត់"></div>
@@ -537,7 +543,7 @@ function openUnitForm(id){ if(!guard()) return;
 function saveUnit(old){
   const id=$("u_id").value.trim(); if(!id) return toast("បញ្ចូលលេខផ្ទះ");
   if(id!==old&&S.units.some(x=>x.id===id)) return toast("លេខផ្ទះនេះមានរួចហើយ");
-  const d={id,block:$("u_block").value.trim().toUpperCase()||"A",type:$("u_type").value,sold:$("u_sold").checked,note:$("u_note").value.trim(),appUrl:$("u_app").value.trim()};
+  const d={id,block:$("u_block").value.trim().toUpperCase()||"A",type:$("u_type").value.trim(),sold:$("u_sold").checked,note:$("u_note").value.trim(),appUrl:$("u_app").value.trim()};
   if(old){const u=S.units.find(x=>x.id===old);Object.assign(u,d);[S.issues,S.payments].forEach(a=>a.forEach(x=>{if(x.unit===old)x.unit=id}));}
   else S.units.push({...d,works:newWorks()});
   S.units.sort((a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true})); save(); closeModal(); render(); toast("បានរក្សាទុក");
@@ -557,13 +563,13 @@ function saveBlock(){
 function openBulk(){ if(!guard()) return;
   openModal(`<h2>បន្ថែមប្លុកទាំងមូល</h2><p class="mini" style="margin-bottom:12px">បង្កើតផ្ទះច្រើនក្នុងពេលតែមួយ ឧ. ប្លុក K, 12 ផ្ទះ → K1 … K12 (ការងារលំនាំដើម ${STAGES.length} មុខក្នុងមួយផ្ទះ)</p>
   <div class="f2"><div class="f"><label>ប្លុក</label><input id="b_block" placeholder="D"></div><div class="f"><label>ចំនួនផ្ទះ</label><input id="b_n" type="number" min="1" max="200" value="10"></div>
-  <div class="f"><label>ប្រភេទ</label><select id="b_type">${opts(TYPES)}</select></div></div>
+  <div class="f"><label>ប្រភេទ</label>${typeField("b_type","")}</div></div>
   <div class="f"><label><input type="checkbox" id="b_skip4" checked> រំលងលេខ 4 (D1, D2, D3, D5 …)</label></div>
   ${foot("saveBulk()")}`);
 }
 function saveBulk(){
   const b=$("b_block").value.trim().toUpperCase(), n=Number($("b_n").value); if(!b||!n) return toast("បញ្ចូលប្លុក និងចំនួន");
-  let added=0; const skip=$("b_skip4").checked; for(let i=1,c=0;c<n;i++){ if(skip&&String(i).includes("4")) continue; c++; const id=`${b}${i}`; if(!S.units.some(x=>x.id===id)){S.units.push({id,block:b,type:$("b_type").value,sold:false,note:"",works:newWorks()});added++;}}
+  let added=0; const skip=$("b_skip4").checked; for(let i=1,c=0;c<n;i++){ if(skip&&String(i).includes("4")) continue; c++; const id=`${b}${i}`; if(!S.units.some(x=>x.id===id)){S.units.push({id,block:b,type:$("b_type").value.trim(),sold:false,note:"",works:newWorks()});added++;}}
   S.units.sort((a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true})); save(); closeModal(); render(); toast(`បានបន្ថែម ${added} ផ្ទះ`);
 }
 function openIssue(id){ if(!canEdit()&&!id) return guard();
