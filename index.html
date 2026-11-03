@@ -298,9 +298,11 @@ function houseApp(u){
   if(u.appUrl) return String(u.appUrl).trim();                       // per-house override
   const t=String((S.project||{}).appUrl||"").trim();
   if(t) return t.replace(/\{house\}/gi,encodeURIComponent(u.id)).replace(/\{file\}/gi,encodeURIComponent(u.file||""));
-  // default: <house>.html beside this page, e.g. .../lvilla1/E12.html
-  if(location.protocol==="http:"||location.protocol==="https:") return appBase()+encodeURIComponent(u.id)+".html";
-  return "";
+  if(location.protocol!=="http:"&&location.protocol!=="https:") return "";
+  // default: the shared house app beside this page, told which Sheet to open
+  if(u.file) return appBase()+"house.html?id="+encodeURIComponent(u.file)+"&house="+encodeURIComponent(u.id);
+  // a house created in the master has no Sheet of its own
+  return appBase()+encodeURIComponent(u.id)+".html";
 }
 function openExt(url){ if(!url) return; window.open(url,"_blank","noopener"); }
 function isSync(u){ return (typeof u==="string"?(S.units.find(x=>x.id===u)||{}):u).src==="sync"; }
@@ -457,7 +459,7 @@ function settings(){
     <div class="f"><label>ថ្ងៃចាប់ផ្តើម</label><input type="date" id="p_start" value="${p.start}"></div><div class="f"><label>ថ្ងៃបញ្ចប់គោលដៅ</label><input type="date" id="p_end" value="${p.end}"></div>
     <div class="f"><label>អ្នកគ្រប់គ្រងគម្រោង</label><input id="p_pm" value="${esc(p.pm)}"></div></div>
     <div class="f"><label>តំណកម្មវិធីគ្រប់គ្រងសំណង់ (template)</label><input id="p_app" value="${esc(p.appUrl||"")}" placeholder="${esc(appBase())}{house}.html"></div>
-    <p class="mini" style="margin:-6px 0 12px"><b>{house}</b> = លេខផ្ទះ · <b>{file}</b> = Google Sheet ID។ ទុកទទេ = ប្រើឯកសារក្បែរទំព័រនេះ៖ <span class="code">${esc(appBase())}&lt;លេខផ្ទះ&gt;.html</span></p>
+    <p class="mini" style="margin:-6px 0 12px"><b>{house}</b> = លេខផ្ទះ · <b>{file}</b> = Google Sheet ID។ ទុកទទេ = <span class="code">${esc(appBase())}house.html?id={file}&amp;house={house}</span></p>
     <button class="btn pri" onclick="saveProject()">រក្សាទុក</button></div>
   <div class="card"><h2 style="margin-bottom:8px">ទិន្នន័យ</h2><p class="mini" style="margin-bottom:12px">ទិន្នន័យរក្សាទុកក្នុង browser នេះ។ នាំចេញជាទៀងទាត់ ឬភ្ជាប់ Google Sheets តាម CONFIG.API_URL ក្នុងកូដ។</p>
     <div class="row"><button class="btn" onclick="exportJSON()">នាំចេញ JSON</button><button class="btn ed" onclick="importJSON()">នាំចូល JSON</button><button class="btn" onclick="exportCSV()">នាំចេញ CSV ការងារ</button><button class="btn danger" onclick="resetAll()">លុបទាំងអស់</button></div></div>`;
