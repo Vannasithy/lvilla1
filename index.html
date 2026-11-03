@@ -154,7 +154,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:#F7F9F6}
 /* ================= CONFIG =================
    ដាក់ URL របស់ Google Apps Script Web App នៅទីនេះ ដើម្បី sync ទៅ Google Sheets.
    ទុកទទេ = រក្សាទុកតែក្នុងឧបករណ៍ (localStorage). */
-const CONFIG = { API_URL: "https://script.google.com/macros/s/AKfycbzQTDt6vQ7AAxkXwYVMrhcXQrzF5WXLb_DXMZvuoSHSWCYwEdyJtb3PH7JgpsM_drY/exec", STORAGE_KEY: "borey_pm_v4" };
+const CONFIG = { API_URL: "https://script.google.com/macros/s/AKfycbzGTd0bRtFcKOSHNOjZCzjQB0zgzo4mUuvtHY8kmB97CJn8t6isXosOe6dCJnLhkJFB/exec", STORAGE_KEY: "borey_pm_v4" };
 
 /* ================= VOCAB ================= */
 const STATUS = ["មិនទាន់ចាប់ផ្តើម","កំពុងសាងសង់","រួចរាល់","បានប្រគល់"];
@@ -237,19 +237,29 @@ async function saveFolder(){
   if(!r.ok) return toast("កំហុស: "+r.error);
   S.folderId=r.folderId; cacheLocal(); toast("បានរក្សាទុក folder");
 }
-async function doPull(){
+async function doPull(full){
   if(!guard()||!REMOTE) return;
   if(dirty) await pushRemote();
-  const el=$("pullLog"); if(el) el.textContent="កំពុងទាញ…"; syncState("កំពុងទាញពីឯកសារផ្ទះ…");
+  const el=$("pullLog"); const show=t=>{ if(el) el.innerHTML=t; };
+  show("កំពុងទាញ…"); syncState("កំពុងទាញពីឯកសារផ្ទះ…");
+  let houses=0, scopes=0, skipped=[], removed=[], guardN=0;
   try{
-    const r=await api({action:"pull",name:ME.name,pin:ME.pin});
-    if(!r.ok){ if(el) el.textContent=""; return toast("ទាញបរាជ័យ: "+r.error); }
-    S=migrate(r.data); VERSION=r.version; cacheLocal(); dirty=false; render();
-    const p=r.report; const log=$("pullLog");
-    if(log) log.innerHTML=`បានទាញ <b>${p.houses}</b> ផ្ទះ · <b>${p.scopes}</b> ការងារ ពី folder "${esc(p.folder)}" (${esc(p.at)})`+
-      (p.skipped.length?`<br><span style="color:var(--amber)">រំលង ${p.skipped.length}: ${p.skipped.map(esc).join("; ")}</span>`:"");
-    syncState("ទាញរួចរាល់"); toast(`បានទាញ ${p.houses} ផ្ទះ`);
-  }catch(e){ if(el) el.textContent=""; toast(apiErr(e)); }
+    while(true){
+      const r=await api({action:"pull",name:ME.name,pin:ME.pin,full:!!full&&guardN===0});
+      if(!r.ok){ show(""); return toast("ទាញបរាជ័យ: "+r.error); }
+      const p=r.report; houses+=p.houses; scopes+=p.scopes;
+      skipped=skipped.concat(p.skipped||[]); removed=removed.concat(p.removed||[]);
+      VERSION=r.version;
+      if(!r.done){ show(`កំពុងទាញ… ${p.to}/${p.total} ឯកសារ · ${houses} ផ្ទះ`); if(++guardN>200) break; continue; }
+      S=migrate(r.data); cacheLocal(); dirty=false; render();
+      const log=$("pullLog");
+      if(log) log.innerHTML=`បានទាញ <b>${houses}</b> ផ្ទះ · <b>${scopes}</b> ការងារ ពី <b>${p.total}</b> ឯកសារ ក្នុង folder "${esc(p.folder)}" (${esc(p.at)})`
+        +(removed.length?`<br>បានដក ${removed.length} ផ្ទះ (ឯកសារលែងមានក្នុង folder): ${removed.map(esc).join(", ")}`:"")
+        +(skipped.length?`<br><span style="color:var(--amber)">រំលង ${skipped.length}: ${skipped.map(esc).join("; ")}</span>`:"");
+      syncState("ទាញរួចរាល់"); toast(`បានទាញ ${houses} ផ្ទះ`);
+      return;
+    }
+  }catch(e){ show(""); toast(apiErr(e)); }
 }
 async function reload(silent){
   if(!REMOTE||!ME) return;
@@ -409,11 +419,11 @@ function admin(){
     <table><tr><th>ឈ្មោះ</th><th>សិទ្ធិ</th><th></th></tr>${S.users.map((u,i)=>`<tr><td>${esc(u.name)}${ME.name===u.name?' <span class="mini">(អ្នក)</span>':""}</td><td><span class="tag ${u.role==="editor"?"good":"s0"}">${u.role==="editor"?"គ្រប់គ្រង / កែប្រែ":"មើលប៉ុណ្ណោះ"}</span></td><td style="text-align:right"><button class="btn sm ed" onclick="openUser(${i})">កែ</button></td></tr>`).join("")}</table>
     <p class="mini" style="margin-top:10px">សិទ្ធិត្រូវបានត្រួតពិនិត្យក្នុង browser ប៉ុណ្ណោះ — សម្រាប់សុវត្ថិភាពពិតប្រាកដ ត្រូវត្រួតពិនិត្យម្តងទៀតក្នុង Apps Script backend។</p></div>
 
-  <div class="card"><div class="unithead"><h2>ការតភ្ជាប់ Construction Management System</h2><button class="btn sm" onclick="doPull()" ${REMOTE?"":"disabled"}>⇄ ទាញឥឡូវ</button></div>
+  <div class="card"><div class="unithead"><h2>ការតភ្ជាប់ Construction Management System</h2><div class="row" style="gap:6px"><button class="btn sm" onclick="doPull(true)" ${REMOTE?"":"disabled"} title="អានគ្រប់ឯកសារឡើងវិញ">ទាញទាំងអស់</button><button class="btn sm pri" onclick="doPull()" ${REMOTE?"":"disabled"}>⇄ ទាញឥឡូវ</button></div></div>
     ${REMOTE?`<div class="f"><label>Project folder ID (Google Drive)</label><input id="fid" value="${esc(S.folderId||"")}" placeholder="1AbC…"></div>
     <button class="btn" onclick="saveFolder()">រក្សាទុក folder</button>
     <p class="mini" style="margin-top:10px">ផ្ទះដែលទាញចូល: <b>${S.units.filter(isSync).length}</b> · ទាញចុងក្រោយ: ${esc(S.lastPull||"មិនទាន់")}</p>
-    <p class="mini">ឯកសារផ្ទះនីមួយៗក្នុង folder ត្រូវមាន tab <b>BOREY_EXPORT</b> (មើល HouseExport.gs)។ ផ្ទះដែលទាញចូលជាទិន្នន័យអានប៉ុណ្ណោះ។</p>
+    <p class="mini">មិនចាំបាច់ដំឡើងអ្វីក្នុងឯកសារផ្ទះទេ — master អានផ្ទាល់ពី tab <b>Scopes</b>, <b>Sub-contracts</b>, <b>Contract BOQ</b>, <b>IPC Payments</b>។ ឈ្មោះឯកសារ = លេខផ្ទះ។ ការងារ និងថវិកាជាទិន្នន័យអានប៉ុណ្ណោះ។</p>
     <div id="pullLog" class="mini" style="margin-top:8px"></div>`:`<p class="mini">តភ្ជាប់ដំណើរការតែពេលភ្ជាប់ Google Sheets (CONFIG.API_URL)។</p>`}</div>
   <div class="card"><div class="unithead"><h2>ប្លុក</h2><button class="btn sm" onclick="openBulk()">+ បន្ថែមប្លុក</button></div>
     ${B.length?`<table><tr><th>ប្លុក</th><th>ផ្ទះ</th><th></th></tr>${B.map(b=>`<tr><td><b>${b}</b></td><td class="mini">${S.units.filter(u=>u.block===b).map(u=>u.id).join(", ")}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" onclick="openBlock('${b}')">ប្តូរឈ្មោះ</button> <button class="btn sm danger" onclick="delBlock('${b}')">លុប</button></td></tr>`).join("")}</table>`:`<div class="empty">មិនទាន់មានប្លុក</div>`}</div>
@@ -444,7 +454,7 @@ function openUnit(id){
   const is=S.issues.filter(i=>i.unit===id&&i.status!=="បានបិទ");
   openModal(`<div class="unithead"><h2>ផ្ទះ ${u.id}</h2><span class="tag s${si}">${STATUS[si]}</span></div>
   <p class="mini" style="margin-bottom:12px">${esc(u.type)} · ប្លុក ${u.block} ${u.sold?"· បានលក់":""}${u.note?" · "+esc(u.note):""}</p>
-  ${isSync(u)?`<p class="mini syncnote">⇄ ទាញពីឯកសារផ្ទះ (Construction Management System) · ${esc(u.syncedAt||"")} — អានប៉ុណ្ណោះ</p>`:""}
+  ${isSync(u)?`<p class="mini syncnote">⇄ ទាញពីឯកសារផ្ទះ · ${esc(u.syncedAt||"")} — ការងារ និងថវិកាអានប៉ុណ្ណោះ (ព័ត៌មានផ្ទះកែបាន)</p>`:""}
   <div class="row" style="margin-bottom:8px"><div class="bar" style="flex:1"><i style="width:${progress(u)}%"></i></div><b id="u_prog">${progress(u)}%</b></div>
   <div class="kpis" style="margin-bottom:12px"><div class="kpi"><b style="font-size:20px">${money(budget(u))}</b><span>ថវិកាសរុប</span></div><div class="kpi warn"><b style="font-size:20px">${money(used(id))}</b><span>បានប្រើ (បានទូទាត់)</span></div><div class="kpi ${remain(u)<0?"bad":"good"}"><b style="font-size:20px">${money(remain(u))}</b><span>នៅសល់</span></div></div>
   <div class="unithead"><h3>ការងារ ${u.works.filter(w=>!w.budget).length?`<span class="tag warn">${u.works.filter(w=>!w.budget).length} គ្មានថវិកា</span>`:""}</h3><div class="row" style="gap:6px${isSync(u)?";display:none":""}"><button class="btn sm ed" onclick="openBudget('${id}')">ថវិកាការងារ</button><button class="btn sm ed" onclick="openWork('${id}')">+ ការងារ</button></div></div>
@@ -453,7 +463,7 @@ function openUnit(id){
     <div class="wr"><input type="range" min="0" max="100" step="5" ${isSync(u)?"disabled":""} value="${w.pct||0}" oninput="setPct('${id}',${w.id},this.value)"><span class="pct" id="wp_${w.id}">${w.pct||0}%</span><div class="wb" ${isSync(u)?'style="display:none"':""}>${w.budget?`<button class="btn sm ed" onclick="openWork('${id}',${w.id})">កែ</button><button class="btn sm ed" onclick="openPay(0,{unit:'${id}',work:${w.id}})">+ ចំណាយ</button>`:`<button class="btn sm pri" onclick="openBudget('${id}',${w.id})">+ ថវិកា</button>`}<button class="btn sm danger ed" title="លុបការងារ" onclick="delWork('${id}',${w.id})">លុប</button></div></div></div>`}).join("")}</div>
   <div class="f" style="margin-top:14px"><label><input type="checkbox" ${u.handedOver?"checked":""} ${canEdit()?"":"disabled"} onchange="S.units.find(x=>x.id==='${id}').handedOver=this.checked;save();render()"> បានប្រគល់ជូនអតិថិជន</label></div>
   ${is.length?`<div class="mini" style="margin-top:8px">បញ្ហាបើក ${is.length}</div>`:""}
-  <div class="actions"><div>${isSync(u)?"":del("ផ្ទះ",`S.units=S.units.filter(x=>x.id!=='${id}');save();closeModal();render()`)}</div><div class="r">${isSync(u)?"":`<button class="btn ed" onclick="openUnitForm('${id}')">កែព័ត៌មាន</button>`}<button class="btn pri" onclick="closeModal()">រួចរាល់</button></div></div>`);
+  <div class="actions"><div>${isSync(u)?"":del("ផ្ទះ",`S.units=S.units.filter(x=>x.id!=='${id}');save();closeModal();render()`)}</div><div class="r"><button class="btn ed" onclick="openUnitForm('${id}')">កែព័ត៌មាន</button><button class="btn pri" onclick="closeModal()">រួចរាល់</button></div></div>`);
 }
 function setPct(id,wid,v){ if(!guard()||!guardSync(id)) return; const u=S.units.find(x=>x.id===id); const w=u.works.find(x=>x.id==wid); w.pct=Number(v); $("wp_"+wid).textContent=v+"%"; save();
   const m=$("modal"); m.querySelector(".bar i").style.width=progress(u)+"%"; $("u_prog").textContent=progress(u)+"%"; const tg=m.querySelector(".unithead .tag"); tg.className="tag s"+statusIdx(u); tg.textContent=STATUS[statusIdx(u)]; render(); }
@@ -496,11 +506,11 @@ function saveWork(uid,wid){
   if(wid) Object.assign(u.works.find(x=>x.id==wid),d); else u.works.push({id:nid(),pct:0,...d});
   save(); render(); openUnit(uid); toast("បានរក្សាទុក");
 }
-function guardSync(id){ if(isSync(id)){ toast("ផ្ទះនេះទាញពី Construction Management System — កែក្នុងឯកសារផ្ទះ"); return false; } return true; }
-function openUnitForm(id){ if(!guard()||(id&&!guardSync(id))) return;
+function guardSync(id){ if(isSync(id)){ toast("ការងារ និងថវិកាមកពីឯកសារផ្ទះ — កែក្នុងឯកសារនោះ"); return false; } return true; }
+function openUnitForm(id){ if(!guard()) return;
   const u=id?S.units.find(x=>x.id===id):{id:"",block:blocks()[0]||"A",type:TYPES[0],sold:false,note:""};
   openModal(`<h2>${id?"កែព័ត៌មានផ្ទះ":"បន្ថែមផ្ទះ"}</h2>
-  <div class="f2"><div class="f"><label>លេខផ្ទះ</label><input id="u_id" value="${esc(u.id)}" placeholder="D5"></div><div class="f"><label>ប្លុក</label><input id="u_block" value="${esc(u.block)}"></div>
+  <div class="f2"><div class="f"><label>លេខផ្ទះ</label><input id="u_id" value="${esc(u.id)}" placeholder="D5" ${id&&isSync(id)?"readonly title='មកពីឈ្មោះឯកសារផ្ទះ'":""}></div><div class="f"><label>ប្លុក</label><input id="u_block" value="${esc(u.block)}"></div>
   <div class="f"><label>ប្រភេទ</label><select id="u_type">${opts(TYPES,u.type)}</select></div></div>
   <div class="f"><label><input type="checkbox" id="u_sold" ${u.sold?"checked":""}> បានលក់</label></div>
   <div class="f"><label>កំណត់ចំណាំ</label><textarea id="u_note" rows="2">${esc(u.note)}</textarea></div>
