@@ -116,7 +116,8 @@ tr.click{cursor:pointer}tr.click:hover td{background:#F7F9F6}
 .ro .btn.pri,.ro .btn.danger,.ro .ed{display:none!important}
 .ro input[type=range]{pointer-events:none;opacity:.55}
 .ro .modal input,.ro .modal select,.ro .modal textarea{pointer-events:none;background:#F1F3EF}
-.ro .login .btn.pri,.ro .login input,.ro .login select{display:block;pointer-events:auto;background:#FAFBFA}
+.ro .login .btn.pri{display:block!important}
+.ro .login input,.ro .login select{display:block!important;pointer-events:auto!important;background:#FAFBFA}
 .ro .click{cursor:default}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -320,11 +321,11 @@ function unitOpts(sel){ return `<option value="">— ទូទៅ —</option>`+
 /* ================= RENDER ================= */
 function go(p){ page=p; render(); window.scrollTo(0,0); }
 function login(){
-  document.body.classList.add("ro");
+  document.body.classList.remove("ro");
   $("main").innerHTML=`<div class="login"><div class="card" style="max-width:380px;margin:60px auto"><div class="brand" style="color:var(--ink);font-size:30px">បូរី</div><p class="mini" style="margin-bottom:16px">${REMOTE?"ភ្ជាប់ជាមួយ Google Sheets":esc(S.project.name)}</p>
     ${REMOTE&&location.protocol==="file:"?`<p class="mini" style="background:var(--amber-soft);color:#7A4A05;padding:8px 10px;border-radius:6px;margin-bottom:12px">ឯកសារនេះបើកពី file:// — Google Sheets មិនអាចភ្ជាប់បានទេ។ ត្រូវដាក់លើ GitHub Pages ឬ web server សិន។</p>`:""}
-    <div class="f"><label>អ្នកប្រើប្រាស់</label>${REMOTE?`<input id="lg_user" autocomplete="username">`:`<select id="lg_user">${S.users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)} — ${u.role==="editor"?"គ្រប់គ្រង":"មើល"}</option>`).join("")}</select>`}</div>
-    <div class="f"><label>លេខសម្ងាត់ (PIN)</label><input type="password" id="lg_pin" inputmode="numeric" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="f"><label>អ្នកប្រើប្រាស់</label>${REMOTE?`<input id="lg_user" autocomplete="username" enterkeyhint="next" onkeydown="if(event.key==='Enter'){event.preventDefault();$('lg_pin').focus()}">`:`<select id="lg_user">${S.users.map(u=>`<option value="${esc(u.name)}">${esc(u.name)} — ${u.role==="editor"?"គ្រប់គ្រង":"មើល"}</option>`).join("")}</select>`}</div>
+    <div class="f"><label>លេខសម្ងាត់ (PIN)</label><input type="password" id="lg_pin" inputmode="numeric" enterkeyhint="go" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin()}"></div>
     <button class="btn pri" id="lg_btn" style="width:100%" onclick="doLogin()">ចូល</button></div></div>`;
   $("nav").innerHTML=""; $("tabbar").innerHTML=""; $("sideProj").innerHTML=""; const f=$(REMOTE?"lg_user":"lg_pin"); if(f) f.focus();
 }
