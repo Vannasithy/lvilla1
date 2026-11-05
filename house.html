@@ -211,6 +211,8 @@ function migrate(d){
   COLLS.forEach(c=>d[c]=d[c]||[]);
   d.settings=Object.assign({project:'',client:'',contractor:'',retention:5,vat:0,clientDays:30},d.settings||{});
   d.suppliers.forEach(s=>{if(s.days==null||s.days===''){const m=String(s.credit||'').match(/\d+/);s.days=m?+m[0]:0}});
+  d.files=d.files||[];
+  if(!CLOUD&&d.users.length&&!d.users.some(u=>u.role==='HR'))d.users.push({id:d.users.some(u=>u.id==='u7')?uid():'u7',name:'Chanthy Kong',role:'HR',pin:'1234'});
   if(!CLOUD&&d.users.length&&!d.users.some(u=>u.role==='FN'))d.users.push({id:d.users.some(u=>u.id==='u6')?uid():'u6',name:'Sokha Meas',role:'FN',pin:'1234'});
   d.pos.forEach(o=>{if(o.status==='Delivered'&&d.moves.some(m=>String(m.ref||'').startsWith('PO-'+String(o.no).padStart(3,'0'))))o.status='Received'});
   if(!CLOUD)d.prs.forEach(p=>{if(!['Being delivered','Delivered'].includes(p.status))return;
@@ -282,8 +284,8 @@ async function poll(){
 
 function seed(){
   const s={settings:{project:'Borey Villa Type A (Sample)',client:'L Group',contractor:'LHB Construction',retention:5,vat:10,clientDays:21},
-    users:[],scopes:[],citems:[],sections:[],iitems:[],subs:[],claims:[],moves:[],prs:[],suppliers:[],reports:[],pos:[],invoices:[],ipcpay:[],seq:{}};
-  [['u1','Sithy','PM'],['u2','Dara Kim','SE'],['u3','Sreyneang Chan','QS'],['u4','Vuthy Ly','ST'],['u5','Rachana Heng','PC'],['u6','Sokha Meas','FN']].forEach(([id,name,role])=>s.users.push({id,name,role,pin:'1234'}));
+    users:[],scopes:[],citems:[],sections:[],iitems:[],subs:[],claims:[],moves:[],prs:[],suppliers:[],reports:[],pos:[],invoices:[],ipcpay:[],files:[],seq:{}};
+  [['u1','Sithy','PM'],['u2','Dara Kim','SE'],['u3','Sreyneang Chan','QS'],['u4','Vuthy Ly','ST'],['u5','Rachana Heng','PC'],['u6','Sokha Meas','FN'],['u7','Chanthy Kong','HR']].forEach(([id,name,role])=>s.users.push({id,name,role,pin:'1234'}));
   [['sc1','Foundation'],['sc2','Structure'],['sc3','Brick Work'],['sc4','MEP'],['sc5','Ceiling']].forEach(([id,name])=>s.scopes.push({id,name}));
   [['c1','sc1','Excavation for footings and ground beams','m3',85,6.5],['c2','sc1','Lean concrete 1:3:6, 50mm thick','m3',6.2,78],['c3','sc1','RC footing C25 incl. rebar & formwork','m3',28.5,260],['c4','sc1','RC ground beam C25 incl. rebar & formwork','m3',14.2,270],['c5','sc1','Backfill and compaction in layers','m3',52,4.8],
    ['c6','sc2','RC columns C30','m3',18.6,420],['c7','sc2','RC beams C30','m3',24.3,390],['c8','sc2','RC slab 120mm C30','m2',186,68],['c9','sc2','RC staircase','m3',4.2,450],
@@ -310,6 +312,11 @@ function seed(){
   s.iitems.push({id:'a9',sectionId:'s10',code:'I-GL-0000021',name:cf('I-GL-0000021').name+' 1830×2440',unit:'pcs',qty:4,cu:'m2',cpu:4.4652,rate:9,stock:true},
     {id:'a10',sectionId:'s10',code:'I-HW-0000430',name:cf('I-HW-0000430').name,unit:'pcs',qty:2,cu:'',cpu:0,rate:7.02,stock:true},
     {id:'a11',sectionId:'s10',code:'I-HW-0000407',name:cf('I-HW-0000407').name,unit:'pcs',qty:4,cu:'',cpu:0,rate:2,stock:true});
+  // management cost and transport: an Internal BOQ section managed by HR
+  s.sections.push({id:'s11',scopeId:'sc2',name:'Management & transport',owner:'HR'});
+  s.iitems.push({id:'h1',sectionId:'s11',name:'Site management (supervisor & guard)',unit:'month',qty:6,rate:650,stock:false},{id:'h2',sectionId:'s11',name:'Transport of materials & workers',unit:'trip',qty:40,rate:25,stock:false});
+  // monthly purchase allowances set by the PM
+  s.iitems.find(x=>x.id==='i1').monthMax=25000;s.iitems.find(x=>x.id==='i2').monthMax=200;
   s.subs=[
     {id:'b1',scopeId:'sc1',name:'Chea Vibol Team',phone:'096 222 4455',amount:1450,reqs:[{id:'q1',no:1,date:'2026-08-20',desc:'Excavation & footings',amount:900,status:'Paid'},{id:'q2',no:2,date:'2026-09-05',desc:'Ground beams & backfill',amount:550,status:'Paid'}]},
     {id:'b2',scopeId:'sc2',name:'Chea Vibol Team',phone:'096 222 4455',amount:11500,reqs:[{id:'q3',no:1,date:'2026-09-10',desc:'Columns GF',amount:3000,status:'Paid'},{id:'q4',no:2,date:'2026-09-30',desc:'Beams & slab L1 part',amount:2800,status:'Paid'},{id:'q5',no:3,date:'2026-10-12',desc:'Slab L1 balance',amount:2400,status:'Requested'}]},
@@ -368,8 +375,8 @@ let me=null;
 const ui={view:'dash',iScope:'sc3',claimId:null,stScope:'all',stQ:'',sel:new Set(),procTab:'req',procF:'open',siteTab:'rep',subOpen:null,pick:null,stTab:'stock',poF:'open',apTab:'sup',apF:'topay',rk:null,rp:{t:'this'}};
 
 /* ============ ROLES ============ */
-const ROLES={PM:'Project Manager',SE:'Site Engineer',QS:'Quantity Surveyor',ST:'Stock Keeper',PC:'Procurement',FN:'Finance'};
-const ACCESS={dash:{PM:'e',SE:'v',QS:'v',FN:'v'},contract:{PM:'e',SE:'v',QS:'v',FN:'v'},internal:{PM:'e',SE:'v',QS:'e'},sub:{PM:'e',SE:'v',QS:'e',FN:'v'},claim:{PM:'e',SE:'v',QS:'e',FN:'v'},stock:{PM:'e',SE:'v',ST:'e'},proc:{PM:'e',SE:'v',PC:'e',FN:'v'},site:{PM:'e',SE:'e'},inv:{PM:'e',FN:'e',QS:'v'},ar:{PM:'e',FN:'e'},ap:{PM:'e',FN:'e'},rep:{PM:'e',SE:'e',QS:'e',ST:'e',PC:'e',FN:'e'},users:{PM:'e'}};
+const ROLES={PM:'Project Manager',SE:'Site Engineer',QS:'Quantity Surveyor',ST:'Stock Keeper',PC:'Procurement',FN:'Finance',HR:'HR (management & transport)'};
+const ACCESS={dash:{PM:'e',SE:'v',QS:'v',FN:'v',HR:'v'},contract:{PM:'e',SE:'v',QS:'v',FN:'v'},internal:{PM:'e',SE:'v',QS:'e',HR:'e'},sub:{PM:'e',SE:'v',QS:'e',FN:'v'},claim:{PM:'e',SE:'v',QS:'e',FN:'v'},stock:{PM:'e',SE:'v',ST:'e'},proc:{PM:'e',SE:'v',PC:'e',FN:'v'},site:{PM:'e',SE:'e'},inv:{PM:'e',FN:'e',QS:'v'},ar:{PM:'e',FN:'e'},ap:{PM:'e',FN:'e'},rep:{PM:'e',SE:'e',QS:'e',ST:'e',PC:'e',FN:'e'},users:{PM:'e'}};
 const NAV=[['dash','Dashboard',''],['contract','Contract BOQ','1'],['internal','Internal BOQ','2'],['sub','Sub-contracts','3'],['claim','Progress Claim','4'],['stock','Stock','5'],['proc','Procurement','6'],['site','Site Team','7'],['inv','Invoices','8'],['ar','Receivables (AR)','9'],['ap','Payables (AP)','10'],['rep','Reports',''],['users','Users & Settings','']];
 const can=v=>(me&&ACCESS[v]&&ACCESS[v][me.role])||null;
 const ed=v=>can(v)==='e';
@@ -503,7 +510,7 @@ V.dash=()=>{
     const ib=sum(S.iitems.filter(i=>{const s=section(i.sectionId);return s&&s.scopeId===sc.id}),iamt);
     const cl=sum(S.claims,c=>sum(its,it=>n(c.lines[it.id])*it.rate));
     return `<tr><td><b>${esc(sc.name)}</b></td>${M()?`<td class="num">${fm(b)}</td><td class="num">${ib?fm(ib):'<span class="muted">—</span>'}</td>`:''}<td>${bar(weightedProg(its,pm))}</td>${M()?`<td>${bar(b?cl/b:0)}</td>`:''}</tr>`}).join('');
-  return ph(esc(S.settings.contractor)+' · '+esc(S.settings.client),'Dashboard')+(PAY()?apAlert():'')+`<div class="kpis">${tiles}</div>
+  return ph(esc(S.settings.contractor)+' · '+esc(S.settings.client),'Dashboard',attBtn('project','Project documents','btn'))+(PAY()?apAlert():'')+`<div class="kpis">${tiles}</div>
   <div class="sec"><div class="sechead"><h2>Progress by scope</h2></div><div class="tw"><table><thead><tr><th>Scope</th>${M()?'<th class="num">Contract budget</th><th class="num">Internal budget</th>':''}<th>Site progress</th>${M()?'<th>Claimed</th>':''}</tr></thead><tbody>${rows}</tbody></table></div></div>
   <div class="sec"><div class="sechead"><h2>Latest site report</h2></div>${last?`<div class="card"><div class="top"><b>${fd(last.date)} · ${esc(last.by)}</b><span class="pill">${esc(last.weather)} · ${last.manpower} workers</span></div><div>${esc(last.notes)}</div><div class="small muted">${Object.keys(last.progress).length} BOQ items updated</div></div>`:'<div class="empty">No site reports yet.</div>'}</div>`;
 };
@@ -512,7 +519,7 @@ V.dash=()=>{
 V.contract=()=>{
   const E=ed('contract'),pm=progressMap(),m=M();let rows='',gt=0;
   S.scopes.forEach((sc,i)=>{const its=S.citems.filter(x=>x.scopeId===sc.id);const st=sum(its,camt);gt+=st;
-    rows+=`<tr class="grp"><td class="code">${i+1}</td><td colspan="${m?4:3}">${esc(sc.name)}</td>${m?`<td class="num">${fm(st)}</td>`:''}<td>${bar(weightedProg(its,pm))}</td><td class="act">${E?`<button class="lnk" data-act="addCItem" data-id="${sc.id}">+ Item</button><button class="lnk" data-act="editScope" data-id="${sc.id}">Rename</button><button class="lnk bad" data-act="delScope" data-id="${sc.id}">Delete</button>`:''}</td></tr>`;
+    rows+=`<tr class="grp"><td class="code">${i+1}</td><td colspan="${m?4:3}">${esc(sc.name)}</td>${m?`<td class="num">${fm(st)}</td>`:''}<td>${bar(weightedProg(its,pm))}</td><td class="act">${attBtn('contract:'+sc.id,'Contract BOQ — '+sc.name)}${E?`<button class="lnk" data-act="addCItem" data-id="${sc.id}">+ Item</button><button class="lnk" data-act="editScope" data-id="${sc.id}">Rename</button><button class="lnk bad" data-act="delScope" data-id="${sc.id}">Delete</button>`:''}</td></tr>`;
     its.forEach(it=>rows+=`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td>${esc(it.unit)}</td><td class="num">${fq(it.qty)}</td>${m?`<td class="num">${fm(it.rate)}</td><td class="num">${fm(camt(it))}</td>`:''}<td>${bar((pm[it.id]||0)/100)}</td><td class="act">${E?`<button class="lnk" data-act="editCItem" data-id="${it.id}">Edit</button><button class="lnk bad" data-act="delCItem" data-id="${it.id}">Delete</button>`:''}</td></tr>`);
     if(!its.length)rows+=`<tr><td></td><td colspan="${m?7:5}" class="muted small">No items in this scope yet.</td></tr>`;
   });
@@ -528,14 +535,14 @@ V.internal=()=>{
   if(!sc)return ph('Section 2','Internal BOQ')+'<div class="empty">Add a scope in the Contract BOQ first.</div>';
   const secs=S.sections.filter(x=>x.scopeId===sc.id);const cb=sum(S.citems.filter(x=>x.scopeId===sc.id),camt);let it=0,rows='';const wq=S.iitems.some(x=>n(x.cpu)>0&&secs.some(s=>s.id===x.sectionId));
   secs.forEach(sec=>{const its=S.iitems.filter(x=>x.sectionId===sec.id);const st=sum(its,iamt);it+=st;
-    rows+=`<tr class="grp"><td class="code">${secLetter(sec)}</td><td colspan="${(m?4:3)+(wq?1:0)}">Section ${secLetter(sec)} — ${esc(sec.name)}</td>${m?`<td class="num">${fm(st)}</td>`:''}<td></td><td class="act">${E?`<button class="lnk" data-act="addIItem" data-id="${sec.id}">+ Item</button><button class="lnk" data-act="pasteItems" data-id="${sec.id}">+ Paste from BOQ</button><button class="lnk" data-act="editSection" data-id="${sec.id}">Rename</button><button class="lnk bad" data-act="delSection" data-id="${sec.id}">Delete</button>`:''}</td></tr>`;
-    its.forEach(x=>rows+=`<tr><td class="code">${iCode(x)}</td><td>${esc(x.name)}${x.code?`<div class="small muted code">${esc(x.code)}</div>`:''}</td><td>${esc(x.unit)}</td><td class="num">${fq(x.qty)}</td>${wq?`<td class="num">${n(x.cpu)?`${fq(r2(n(x.qty)*n(x.cpu)))} ${esc(x.cu)}<div class="small muted">${fq(x.cpu)} ${esc(x.cu)}/${esc(x.unit)}</div>`:'<span class="muted">—</span>'}</td>`:''}${m?`<td class="num">${fm(x.rate)}${n(x.cpu)?'/'+esc(x.cu):''}</td><td class="num">${fm(iamt(x))}</td>`:''}<td>${x.stock?'<span class="pill info">Stock</span>':'<span class="pill">Not stocked</span>'}</td><td class="act">${E?`<button class="lnk" data-act="editIItem" data-id="${x.id}">Edit</button><button class="lnk bad" data-act="delIItem" data-id="${x.id}">Delete</button>`:''}</td></tr>`);
+    rows+=`<tr class="grp"><td class="code">${secLetter(sec)}</td><td colspan="${(m?4:3)+(wq?1:0)}">Section ${secLetter(sec)} — ${esc(sec.name)}${sec.owner==='HR'?' <span class="pill info" title="Managed by HR">HR</span>':''}</td>${m?`<td class="num">${fm(st)}</td>`:''}<td></td><td class="act">${canSec(sec)?`<button class="lnk" data-act="addIItem" data-id="${sec.id}">+ Item</button><button class="lnk" data-act="pasteItems" data-id="${sec.id}">+ Paste from BOQ</button><button class="lnk" data-act="editSection" data-id="${sec.id}">Rename</button><button class="lnk bad" data-act="delSection" data-id="${sec.id}">Delete</button>`:''}</td></tr>`;
+    its.forEach(x=>rows+=`<tr><td class="code">${iCode(x)}</td><td>${esc(x.name)}${x.code?`<div class="small muted code">${esc(x.code)}</div>`:''}</td><td>${esc(x.unit)}</td><td class="num">${fq(x.qty)}</td>${wq?`<td class="num">${n(x.cpu)?`${fq(r2(n(x.qty)*n(x.cpu)))} ${esc(x.cu)}<div class="small muted">${fq(x.cpu)} ${esc(x.cu)}/${esc(x.unit)}</div>`:'<span class="muted">—</span>'}</td>`:''}${m?`<td class="num">${fm(x.rate)}${n(x.cpu)?'/'+esc(x.cu):''}</td><td class="num">${fm(iamt(x))}</td>`:''}<td>${x.stock?'<span class="pill info">Stock</span>':'<span class="pill">Not stocked</span>'}${n(x.monthMax)?`<div class="small muted">max ${fq(x.monthMax)}/month</div>`:''}</td><td class="act">${canSec(sec)?`<button class="lnk" data-act="editIItem" data-id="${x.id}">Edit</button><button class="lnk bad" data-act="delIItem" data-id="${x.id}">Delete</button>`:''}</td></tr>`);
     if(!its.length)rows+=`<tr><td></td><td colspan="${(m?7:5)+(wq?1:0)}" class="muted small">No items in this section yet.</td></tr>`;
   });
   if(m&&secs.length)rows+=`<tr class="tot"><td></td><td colspan="${4+(wq?1:0)}">Internal total — ${esc(sc.name)}</td><td class="num">${fm(it)}</td><td colspan="2"></td></tr>`;
   const diff=cb-it;
   const kp=m?`<div class="kpis"><div class="kpi"><div class="l">Contract budget</div><div class="v">${fm(cb)}</div><div class="s">From Contract BOQ</div></div><div class="kpi"><div class="l">Internal budget</div><div class="v">${fm(it)}</div><div class="s">${secs.length} sections</div></div><div class="kpi"><div class="l">${diff>=0?'Margin':'Over budget'}</div><div class="v" style="color:var(--${diff>=0?'ok':'bad'})">${fm(diff)}</div><div class="s">${cb?fp(diff/cb):'—'} of contract budget</div></div></div>`:'';
-  return ph('Section 2 · Detailed cost by scope','Internal BOQ','<button class="btn" data-act="catOpen">Item catalogue</button>'+(E?`<button class="btn pri" data-act="addSection">+ Section in ${esc(sc.name)}</button>`:''))+`<div class="toolbar">${chips}</div>`+kp+
+  return ph('Section 2 · Detailed cost by scope','Internal BOQ',attBtn('internal:'+sc.id,'Internal BOQ — '+sc.name,'btn')+'<button class="btn" data-act="catOpen">Item catalogue</button>'+(E?`<button class="btn pri" data-act="addSection">+ Section in ${esc(sc.name)}</button>`:''))+`<div class="toolbar">${chips}</div>`+kp+
   (secs.length?`<div class="tw"><table><thead><tr><th>No.</th><th>Item</th><th>Unit</th><th class="num">Qty</th>${wq?'<th class="num">Priced qty</th>':''}${m?'<th class="num">Unit price</th><th class="num">Amount</th>':''}<th>Stock</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty">No sections for ${esc(sc.name)} yet.${E?' Add Section A to start.':''}</div>`);
 };
 
@@ -545,7 +552,7 @@ V.sub=()=>{
   if(ui.subTab==='ipc')return ph('Section 3 · Labour contracts per scope','Sub-contracts')+subTabs()+vIpc();
   const T={c:0,q:0,p:0};
   S.subs.forEach(s=>{const f=subFig(s);T.c+=f.c;T.q+=f.q;T.p+=f.p;const open=ui.subOpen===s.id,sc=scope(s.scopeId);
-    rows+=`<tr><td><b>${esc(sc?sc.name:'—')}</b></td><td>${esc(s.name)}${s.ipcSheetId?` <span class="pill info" title="Figures come from the IPC system">IPC</span>${f.n!=null?`<div class="small muted">${f.n} house${pl(f.n)}${f.wait?` · ${f.wait} claim${pl(f.wait)} waiting approval`:''}</div>`:''}`:''}</td><td class="small">${esc(s.phone)}</td><td class="num">${fm(f.c)}</td><td class="num" style="color:var(--warn)">${fm(f.q)}</td><td class="num">${fm(f.p)}</td><td class="num"><b>${fm(f.c-f.p)}</b></td><td>${bar(f.c?f.p/f.c:0)}</td><td class="act">${s.ipcSheetId&&s.ipcAppUrl?`<a class="lnk" href="${esc(s.ipcAppUrl)}" target="_blank" rel="noopener" title="Open the IPC system in a new tab">Claims ↗</a>`:`<button class="lnk" data-act="toggleSub" data-id="${s.id}">${open?'Hide':(s.ipcSheetId?'Claims':'Requests')}</button>`}${E?`<button class="lnk" data-act="editSub" data-id="${s.id}">Edit</button><button class="lnk bad" data-act="delSub" data-id="${s.id}">Delete</button>`:''}</td></tr>`;
+    rows+=`<tr><td><b>${esc(sc?sc.name:'—')}</b></td><td>${esc(s.name)}${s.ipcSheetId?` <span class="pill info" title="Figures come from the IPC system">IPC</span>${f.n!=null?`<div class="small muted">${f.n} house${pl(f.n)}${f.wait?` · ${f.wait} claim${pl(f.wait)} waiting approval`:''}</div>`:''}`:''}</td><td class="small">${esc(s.phone)}</td><td class="num">${fm(f.c)}</td><td class="num" style="color:var(--warn)">${fm(f.q)}</td><td class="num">${fm(f.p)}</td><td class="num"><b>${fm(f.c-f.p)}</b></td><td>${bar(f.c?f.p/f.c:0)}</td><td class="act">${s.ipcSheetId&&s.ipcAppUrl?`<a class="lnk" href="${esc(s.ipcAppUrl)}" target="_blank" rel="noopener" title="Open the IPC system in a new tab">Claims ↗</a>`:`<button class="lnk" data-act="toggleSub" data-id="${s.id}">${open?'Hide':(s.ipcSheetId?'Claims':'Requests')}</button>`}${attBtn('sub:'+s.id,'Sub-contract — '+s.name)}${E?`<button class="lnk" data-act="editSub" data-id="${s.id}">Edit</button><button class="lnk bad" data-act="delSub" data-id="${s.id}">Delete</button>`:''}</td></tr>`;
     if(open)rows+=`<tr><td colspan="9" style="background:var(--thead);padding:12px">${s.ipcSheetId?subIpcDetail(s):subReqDetail(s,RQ)}</td></tr>`});
   if(S.subs.length)rows+=`<tr class="tot"><td colspan="3">Total</td><td class="num">${fm(T.c)}</td><td class="num">${fm(T.q)}</td><td class="num">${fm(T.p)}</td><td class="num">${fm(T.c-T.p)}</td><td>${bar(T.c?T.p/T.c:0)}</td><td></td></tr>`;
   return ph('Section 3 · Labour contracts per scope','Sub-contracts',E?'<button class="btn pri" data-act="addSub">+ Sub-contract</button>':'')+subTabs()+
@@ -576,29 +583,30 @@ V.claim=()=>{
   let rows='',T={ca:0,pa:0,ua:0,cua:0};
   S.scopes.forEach((sc,i)=>{const its=S.citems.filter(x=>x.scopeId===sc.id);if(!its.length)return;
     const s={ca:sum(its,camt),pa:sum(its,x=>R[x.id].prev*x.rate),ua:sum(its,x=>R[x.id].cur*x.rate),cua:sum(its,x=>R[x.id].cum*x.rate)};Object.keys(T).forEach(k=>T[k]+=s[k]);
-    rows+=`<tr class="grp"><td class="code">${i+1}</td><td colspan="${m?2:3}">${esc(sc.name)}</td>${m?`<td></td><td></td><td class="num">${fm(s.ca)}</td><td class="bl"></td><td class="num">${fm(s.pa)}</td><td class="bl"></td><td class="num" id="sg_ua_${sc.id}">${fm(s.ua)}</td><td class="bl"></td><td class="num" id="sg_cua_${sc.id}">${fm(s.cua)}</td><td class="num" id="sg_p_${sc.id}">${fp(s.ca?s.cua/s.ca:0)}</td>`:'<td class="bl"></td><td class="bl"></td><td class="bl"></td><td></td>'}<td class="bl"></td></tr>`;
-    its.forEach(it=>{const r=R[it.id];const over=r.cum>n(it.qty)+1e-9;
-      const cur=edit?`<input class="qin ${over?'over':''}" id="cq_${it.id}" data-cq="${it.id}" type="number" step="any" min="0" value="${r.cur||''}" placeholder="0" aria-label="Current qty ${esc(it.desc)}">`:fq(r.cur);
-      rows+=`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td>${esc(it.unit)}</td><td class="num">${fq(it.qty)}</td>${m?`<td class="num">${fm(it.rate)}</td><td class="num">${fm(camt(it))}</td>`:''}<td class="num bl">${fq(r.prev)}</td>${m?`<td class="num">${fm(r.prev*it.rate)}</td>`:''}<td class="num bl">${cur}</td>${m?`<td class="num" id="ua_${it.id}">${fm(r.cur*it.rate)}</td>`:''}<td class="num bl" id="cu_${it.id}">${fq(r.cum)}</td>${m?`<td class="num" id="cua_${it.id}">${fm(r.cum*it.rate)}</td>`:''}<td class="num" id="cp_${it.id}" style="${over?'color:var(--bad)':''}">${fp(n(it.qty)?r.cum/it.qty:0)}</td><td class="num bl muted">${fq(pm[it.id]||0)}%</td></tr>`});
+    rows+=`<tr class="grp"><td class="code">${i+1}</td><td colspan="${m?2:3}">${esc(sc.name)}</td>${m?`<td></td><td></td><td class="num">${fm(s.ca)}</td><td class="bl"></td><td class="num">${fm(s.pa)}</td><td class="bl"></td><td class="num" id="sg_ua_${sc.id}">${fm(s.ua)}</td><td class="num bl" id="sg_p_${sc.id}">${fp(s.ca?s.cua/s.ca:0)}</td><td class="num" id="sg_cua_${sc.id}">${fm(s.cua)}</td>`:'<td class="bl"></td><td class="bl"></td><td class="bl"></td>'}<td class="bl"></td></tr>`;
+    its.forEach(it=>{const r=R[it.id];const over=r.cum>n(it.qty)*(1+1e-6)+1e-9;const prevP=n(it.qty)?r.prev/n(it.qty)*100:0;
+      const cur=edit?`<input class="qin ${over?'over':''}" id="cq_${it.id}" data-cq="${it.id}" type="number" step="any" min="0" max="${r2(Math.max(0,100-prevP))}" value="${r.cur?r2(r.cur/n(it.qty)*100):''}" placeholder="0" aria-label="This claim percent ${esc(it.desc)}"> %`:pctQ(r.cur,it);
+      rows+=`<tr><td class="code">${cCode(it)}</td><td>${esc(it.desc)}</td><td>${esc(it.unit)}</td><td class="num">${fq(it.qty)}</td>${m?`<td class="num">${fm(it.rate)}</td><td class="num">${fm(camt(it))}</td>`:''}<td class="num bl">${pctQ(r.prev,it)}</td>${m?`<td class="num">${fm(r.prev*it.rate)}</td>`:''}<td class="num bl" style="white-space:nowrap">${cur}</td>${m?`<td class="num" id="ua_${it.id}">${fm(r.cur*it.rate)}</td>`:''}<td class="num bl" id="cu_${it.id}" style="${over?'color:var(--bad)':''}">${pctQ(r.cum,it)}</td>${m?`<td class="num" id="cua_${it.id}">${fm(r.cum*it.rate)}</td>`:''}<td class="num bl muted">${fq(pm[it.id]||0)}%</td></tr>`});
   });
-  if(m)rows+=`<tr class="tot"><td></td><td colspan="4">Total</td><td class="num">${fm(T.ca)}</td><td class="bl"></td><td class="num">${fm(T.pa)}</td><td class="bl"></td><td class="num" id="t_ua">${fm(T.ua)}</td><td class="bl"></td><td class="num" id="t_cua">${fm(T.cua)}</td><td class="num" id="t_p">${fp(T.ca?T.cua/T.ca:0)}</td><td class="bl"></td></tr>`;
-  const head=m?`<tr><th colspan="3"></th><th colspan="3" class="grpth">Contract</th><th colspan="2" class="grpth">Previous</th><th colspan="2" class="grpth">This claim</th><th colspan="3" class="grpth">Cumulative</th><th class="grpth">Site</th></tr><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th><th class="num bl">Qty</th><th class="num">Amount</th><th class="num bl">Qty</th><th class="num">Amount</th><th class="num bl">Qty</th><th class="num">Amount</th><th class="num">%</th><th class="num bl">%</th></tr>`
-    :`<tr><th colspan="3"></th><th class="grpth">Contract</th><th class="grpth">Previous</th><th class="grpth">This claim</th><th colspan="2" class="grpth">Cumulative</th><th class="grpth">Site</th></tr><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th><th class="num bl">Qty</th><th class="num bl">Qty</th><th class="num bl">Qty</th><th class="num">%</th><th class="num bl">%</th></tr>`;
+  if(m)rows+=`<tr class="tot"><td></td><td colspan="4">Total</td><td class="num">${fm(T.ca)}</td><td class="bl"></td><td class="num">${fm(T.pa)}</td><td class="bl"></td><td class="num" id="t_ua">${fm(T.ua)}</td><td class="num bl" id="t_p">${fp(T.ca?T.cua/T.ca:0)}</td><td class="num" id="t_cua">${fm(T.cua)}</td><td class="bl"></td></tr>`;
+  const head=m?`<tr><th colspan="3"></th><th colspan="3" class="grpth">Contract</th><th colspan="2" class="grpth">Previous</th><th colspan="2" class="grpth">This claim</th><th colspan="2" class="grpth">Cumulative</th><th class="grpth">Site</th></tr><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th><th class="num bl">%</th><th class="num">Amount</th><th class="num bl">%</th><th class="num">Amount</th><th class="num bl">%</th><th class="num">Amount</th><th class="num bl">%</th></tr>`
+    :`<tr><th colspan="3"></th><th class="grpth">Contract</th><th class="grpth">Previous</th><th class="grpth">This claim</th><th class="grpth">Cumulative</th><th class="grpth">Site</th></tr><tr><th>No.</th><th>Description</th><th>Unit</th><th class="num">Qty</th><th class="num bl">%</th><th class="num bl">%</th><th class="num bl">%</th><th class="num bl">%</th></tr>`;
   const next={Draft:'Submitted',Submitted:'Approved'}[c.status];const inv=invOfClaim(c.id);
   const cacts=E?`${edit?'<button class="btn" data-act="fillClaim">Fill from site progress</button>':''}${next?`<button class="btn" data-act="claimStatus" data-s="${next}">Mark ${next.toLowerCase()}</button>`:''}${c.status!=='Draft'&&!inv&&c.id===cs[cs.length-1].id?'<button class="btn" data-act="claimStatus" data-s="Draft">Reopen as draft</button>':''}${!inv&&c.id===cs[cs.length-1].id?'<button class="btn danger" data-act="delClaim">Delete</button>':''}`:'';
   return ph('Section 4 · IPC breakdown against Contract BOQ','Progress Claim',acts)+`<div class="toolbar">${chips}</div>
   <div class="ipc-head"><div><div class="l">Project</div><div class="v">${esc(S.settings.project)}</div></div><div><div class="l">Claim no.</div><div class="v">${ipcNo(c)}</div></div><div><div class="l">Valuation date</div><div class="v">${fd(c.date)}</div></div><div><div class="l">Status</div><div class="v"><span class="pill ${pill}">${c.status}</span></div></div>${m?`<div><div class="l">Invoice</div><div class="v">${inv?`${invNo(inv)} <span class="pill ${invPay(inv).tag[1]}">${invPay(inv).tag[0]}</span>`:'<span class="muted">Not invoiced</span>'}</div></div>`:''}</div>
-  <div class="toolbar" style="justify-content:space-between"><span class="small muted">${edit?'Type the quantity done this period in “This claim”. Previous = sum of earlier claims.':'This claim is locked. Reopen the latest claim as a draft to change it.'}</span><div class="acts">${cacts}</div></div>
+  <div class="toolbar" style="justify-content:space-between"><span class="small muted">${edit?'Type the % of each item done this period in “This claim”. Previous = total of earlier claims; the cumulative cannot pass 100%.':'This claim is locked. Reopen the latest claim as a draft to change it.'}</span><div class="acts">${cacts}</div></div>
   <div class="tw"><table><thead>${head}</thead><tbody>${rows}</tbody></table></div>
   ${m?`<div class="sec"><div id="summ">${claimSummary(c)}</div></div>`:''}
   <div class="sign"><div><b>Prepared by</b>Quantity Surveyor<br>Date:</div><div><b>Checked by</b>Project Manager<br>Date:</div><div><b>Approved by</b>${esc(S.settings.client)}<br>Date:</div></div>`;
 };
+const pctQ=(q,it)=>fq(n(it.qty)?r2(n(q)/n(it.qty)*100):0)+'%';
 function claimSummary(c){const{cum,prev,cur,rp,ret}=claimNet(c);
   const row=(l,v,cls='')=>`<div class="${cls}">${l}</div><div class="num ${cls}">${v}</div>`;
   return `<div class="summ">${row('A. Cumulative work done to date',fm(cum))}${row('B. Less previous claims',fm(-prev))}${row('C. Work done this period (A − B)',fm(cur))}${row(`D. Less retention ${n(S.settings.retention)}% of C`,fm(-ret))}${row('E. Cumulative retention held',fm(cum*rp))}${row('Net amount due this claim (C − D)',fm(cur-ret),'net')}</div>`}
-function updClaimRow(id){const c=S.claims.find(x=>x.id===ui.claimId);const it=citem(id);const R=claimRows(c);const r=R[id];const m=M();const over=r.cum>n(it.qty)+1e-9;
+function updClaimRow(id){const c=S.claims.find(x=>x.id===ui.claimId);const it=citem(id);const R=claimRows(c);const r=R[id];const m=M();const over=r.cum>n(it.qty)*(1+1e-6)+1e-9;
   const set=(k,v)=>{const el=document.getElementById(k);if(el)el.textContent=v};
-  set('cu_'+id,fq(r.cum));const cp=document.getElementById('cp_'+id);if(cp){cp.textContent=fp(n(it.qty)?r.cum/it.qty:0);cp.style.color=over?'var(--bad)':''}
+  const cu=document.getElementById('cu_'+id);if(cu){cu.textContent=pctQ(r.cum,it);cu.style.color=over?'var(--bad)':''}
   const inp=document.getElementById('cq_'+id);if(inp)inp.classList.toggle('over',over);
   if(!m)return;set('ua_'+id,fm(r.cur*it.rate));set('cua_'+id,fm(r.cum*it.rate));
   const its=S.citems.filter(x=>x.scopeId===it.scopeId);const ca=sum(its,camt),cua=sum(its,x=>R[x.id].cum*x.rate);
@@ -707,13 +715,15 @@ function prModal(source,prefill={}){
     if(!items.length){toast('Enter a quantity for at least one item','bad');return}
     const over=items.map(i=>({i,it:iitem(i.itemId),s:stockOf(i.itemId)})).filter(x=>x.i.qty>x.s.toBuy+1e-9);
     if(over.length){toast('More than the Internal BOQ allows — '+over.map(x=>`${x.it.name}: only ${fq(x.s.toBuy)} ${x.it.unit} left to order`).join(' · '),'bad');return}
+    const mo=items.map(i=>({i,it:iitem(i.itemId),l:monthLeft(i.itemId)})).filter(x=>x.i.qty>x.l+1e-9);
+    if(mo.length){toast('Over the monthly purchase allowance — '+mo.map(x=>`${x.it.name}: ${fq(x.it.monthMax)} ${x.it.unit} per month, ${fq(x.l)} left this month`).join(' · '),'bad');return}
     const p={id:uid(),no:Math.max(0,...S.prs.map(x=>n(x.no)))+1,date:today(),needBy:$('#f_needBy').value,source:prCtx.source,by:$('#f_by').value.trim()||me.name,items,status:'Pending',supplierId:'',note:$('#f_note').value.trim(),hist:[]};
     S.prs.push(p);if(prCtx.source==='Stock'){ui.sel.clear();ui.stTab='req'}save();closeModal();render();toast(prNo(p)+' sent to procurement')}}
 function prBody(){
   const scs=S.scopes.filter(s=>S.iitems.some(i=>i.stock&&iScopeId(i)===s.id));const cnt=Object.values(prCtx.tmp).filter(q=>n(q)>0).length;
   const its=S.iitems.filter(i=>i.stock&&iScopeId(i)===prCtx.sc);
   $('#prbody').innerHTML=`<div class="sechead" style="margin-bottom:8px"><div class="chips">${scs.map(s=>`<button type="button" class="chip ${s.id===prCtx.sc?'on':''}" data-act="prScope" data-id="${s.id}">${esc(s.name)}</button>`).join('')}</div><span class="pill info" id="prcnt">${cnt} item${cnt===1?'':'s'} in request</span></div>
-  <div class="tw" style="max-height:44vh;overflow:auto"><table><thead><tr><th>No.</th><th>Internal BOQ item</th><th>Unit</th><th class="num">BOQ qty</th><th class="num">On hand</th><th class="num">Left to order</th><th class="num">Request qty</th></tr></thead><tbody>${its.map(i=>{const s=stockOf(i.id);return `<tr><td class="code">${iCode(i)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td class="num">${fq(s.boq)}</td><td class="num">${fq(s.onHand)}</td><td class="num">${fq(s.toBuy)}</td><td class="num"><input class="qin ${n(prCtx.tmp[i.id])>s.toBuy+1e-9?'over':''}" data-pq="${i.id}" type="number" min="0" step="any" value="${prCtx.tmp[i.id]||''}" placeholder="0" aria-label="Request qty ${esc(i.name)}"></td></tr>`}).join('')}</tbody></table></div>`}
+  <div class="tw" style="max-height:44vh;overflow:auto"><table><thead><tr><th>No.</th><th>Internal BOQ item</th><th>Unit</th><th class="num">BOQ qty</th><th class="num">On hand</th><th class="num">Left to order</th><th class="num">Left this month</th><th class="num">Request qty</th></tr></thead><tbody>${its.map(i=>{const s=stockOf(i.id);return `<tr><td class="code">${iCode(i)}</td><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td class="num">${fq(s.boq)}</td><td class="num">${fq(s.onHand)}</td><td class="num">${fq(s.toBuy)}</td><td class="num">${monthLeft(i.id)===Infinity?'<span class="muted small">no limit</span>':fq(monthLeft(i.id))}</td><td class="num"><input class="qin ${n(prCtx.tmp[i.id])>prLimit(i.id)+1e-9?'over':''}" data-pq="${i.id}" type="number" min="0" step="any" value="${prCtx.tmp[i.id]||''}" placeholder="0" aria-label="Request qty ${esc(i.name)}"></td></tr>`}).join('')}</tbody></table></div>`}
 
 function prDetail(id){
   const p=S.prs.find(x=>x.id===id),E=ed('proc'),m=M();
@@ -754,7 +764,7 @@ function poDetail(id){
   ${o.note?`<p class="small">${esc(o.note)}</p>`:''}
   <div class="tw"><table><thead><tr><th>No.</th><th>Item</th><th>Unit</th><th class="num">Qty</th>${m?'<th class="num">Unit price</th><th class="num">Amount</th>':''}</tr></thead><tbody>${rows}${m?`<tr class="tot"><td colspan="5">Total</td><td class="num">${fm(pp.amt)}</td></tr>`:''}</tbody></table></div>
   ${m?`<div class="sec"><div class="sechead"><h2>Payments</h2><span class="pill ${pp.tag[1]}">${pp.tag[0]}</span></div>${pays?`<div class="tw"><table><thead><tr><th>Date</th><th>Reference</th><th class="num">Amount</th></tr></thead><tbody>${pays}<tr class="tot"><td colspan="2">Balance to pay</td><td class="num">${fm(pp.bal)}</td></tr></tbody></table></div>`:`<p class="small muted" style="margin:0">No payments yet. Balance ${fm(pp.bal)}.</p>`}</div>`:''}
-  <div class="mact">${E&&PO_CAN_CANCEL(o)?`<button class="btn danger" data-act="poCancel" data-id="${o.id}">Cancel PO</button>`:''}<button class="btn" data-act="close">Close</button>${PAY()&&o.status!=='Cancelled'&&pp.bal>0.004?`<button class="btn" data-act="poPayNew" data-id="${o.id}">Record payment</button>`:''}${E&&PO_NEXT[o.status]?`<button class="btn pri" data-act="poAdvance" data-id="${o.id}">${PO_BTN[o.status]}</button>`:''}</div>`,true)}
+  <div class="mact">${attBtn('po:'+o.id,poNo(o),'btn')}${E&&PO_CAN_CANCEL(o)?`<button class="btn danger" data-act="poCancel" data-id="${o.id}">Cancel PO</button>`:''}<button class="btn" data-act="close">Close</button>${PAY()&&o.status!=='Cancelled'&&pp.bal>0.004?`<button class="btn" data-act="poPayNew" data-id="${o.id}">Record payment</button>`:''}${E&&PO_NEXT[o.status]?`<button class="btn pri" data-act="poAdvance" data-id="${o.id}">${PO_BTN[o.status]}</button>`:''}</div>`,true)}
 
 function poAdvance(o){const nx=PO_NEXT[o.status];if(!nx)return;o.status=nx;(o.hist=o.hist||[]).push({s:nx,date:today(),by:me.name});
   if(nx==='Delivered'){o.deliveredDate=today();o.dueDate=addDays(o.deliveredDate,o.creditDays)}
@@ -1021,12 +1031,54 @@ V.rep=()=>{
   const per=`<div class="chips">${[['last','Last month'],['this','This month'],['next','Next month'],['custom','Custom dates']].map(([k,l])=>`<button class="chip ${pr.t===k?'on':''}" data-act="rpT" data-id="${k}">${l}</button>`).join('')}</div>${pr.t==='custom'?`<input class="in" type="date" id="rpFrom" value="${P[0]}" style="width:auto" aria-label="From date"><span class="muted">to</span><input class="in" type="date" id="rpTo" value="${P[1]}" style="width:auto" aria-label="To date">`:''}`;
   return ph(esc(S.settings.project)+' · '+fd(P[0])+' – '+fd(P[1]),name,CLOUD?'<button class="btn" data-act="printRep">Print / PDF</button>':'')+`<div class="toolbar no-print">${tabs}</div><div class="toolbar no-print">${per}</div>`+RPT[ui.rk](P)+`<p class="hint" style="margin-top:20px">Prepared by ${esc(me.name)} (${ROLES[me.role]}) on ${fd(today())}.</p>`};
 
+/* ---------- ATTACHMENTS (PDF / images on project, scopes, sub-contracts, POs) ---------- */
+const ATT_MAX=CLOUD?10*1024*1024:1024*1024;           // browser-only version keeps files in this browser, so smaller
+const PRICED_T=/^(contract|internal|po|invoice)/;      // may show prices: hidden from Site Engineers
+const canSeeT=t=>me.role!=='SE'||!PRICED_T.test(t);
+const canUpT=t=>canSeeT(t)&&(me.role!=='SE'||/^(sub|project)/.test(t));
+const filesOf=t=>(S.files||[]).filter(f=>f.target===t);
+const fsize=b=>b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';
+function attBtn(t,label,cls='lnk'){if(!canSeeT(t))return '';const k=filesOf(t).length;return `<button class="${cls}" data-act="attOpen" data-t="${esc(t)}" data-l="${esc(label)}" title="Attached files">Files${k?` · ${k}`:''}</button>`}
+function attModal(t,label){
+  const L=filesOf(t).sort((a,b)=>a.date<b.date?1:-1),up=canUpT(t);
+  modal(`<h3>Files — ${esc(label)}</h3>${L.length?`<div class="tw"><table><thead><tr><th>File</th><th>Added</th><th class="num">Size</th><th></th></tr></thead><tbody>${L.map(f=>`<tr><td><b>${esc(f.name)}</b>${f.note?`<div class="small muted">${esc(f.note)}</div>`:''}</td><td class="small">${fd(f.date)}<div class="muted">${esc(f.by)}</div></td><td class="num small">${fsize(n(f.size))}</td><td class="act"><button class="lnk" data-act="attGet" data-id="${f.id}">Open</button>${me.role==='PM'||f.by===me.name?`<button class="lnk bad" data-act="attDel" data-id="${f.id}" data-t="${esc(t)}" data-l="${esc(label)}">Delete</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No files attached yet.</div>'}
+  <div id="attmsg" class="small" style="margin-top:8px"></div>
+  ${up?`<div class="sec"><h2>Attach files</h2><form id="atf" class="fgrid"><label class="f full" for="atfile">PDF or image, up to ${fsize(ATT_MAX)} each<input class="in" id="atfile" type="file" multiple accept=".pdf,application/pdf,image/*"></label>${field({k:'atnote',l:'Note (optional — e.g. Approved BOQ rev.2, signed contract)',full:true})}<div class="mact"><button class="btn pri" id="atgo">Upload</button></div></form></div>`:''}
+  <div class="mact"><button class="btn" data-act="close">Close</button></div>`,true);
+  if(!up)return;
+  $('#atf').onsubmit=async e=>{e.preventDefault();const fs=[...$('#atfile').files];if(!fs.length){toast('Choose a file first','bad');return}
+    const big=fs.find(f=>f.size>ATT_MAX);if(big){toast(`${big.name} is larger than ${fsize(ATT_MAX)}`,'bad');return}
+    const bad=fs.find(f=>!/pdf$|^image\//.test(f.type));if(bad){toast(`${bad.name} is not a PDF or image`,'bad');return}
+    const note=$('#f_atnote').value.trim(),b=$('#atgo');b.disabled=true;
+    for(const [k,f] of fs.entries()){b.textContent=`Uploading ${k+1} of ${fs.length}…`;
+      const url=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)});
+      const rec={id:uid(),target:t,name:f.name,mime:f.type,size:f.size,by:me.name,date:today(),note};
+      if(CLOUD){try{const r=await api('upload',Object.assign({},rec,{data:url.split(',')[1]}));S.files.push(r.file);C.rev=r.rev||C.rev}catch(err){b.disabled=false;b.textContent='Upload';handleErr(err);return}}
+      else{S.files.push(Object.assign(rec,{data:url}));save()}}
+    render();attModal(t,label);toast(`${fs.length} file${pl(fs.length)} attached`)}}
+async function attGet(id){const f=(S.files||[]).find(x=>x.id===id);if(!f)return;
+  const w=window.open('','_blank');const show=url=>{if(w)w.location.href=url;else{const m=$('#attmsg');if(m)m.innerHTML=`<a href="${url}" target="_blank" rel="noopener">Open ${esc(f.name)}</a>`}};
+  try{let mime=f.mime,b64;
+    if(CLOUD){const r=await api('fileGet',{id});b64=r.data;mime=r.mime||mime}else b64=String(f.data||'').split(',')[1];
+    const bin=atob(b64||''),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    show(URL.createObjectURL(new Blob([u8],{type:mime})))}catch(e){if(w)w.close();handleErr(e)}}
+
+/* ---------- MONTHLY PURCHASE ALLOWANCE ---------- */
+const ym=()=>today().slice(0,7);
+const monthUsed=id=>sum(S.prs.filter(p=>p.status!=='Cancelled'&&String(p.date).slice(0,7)===ym()).flatMap(p=>p.items.filter(i=>i.itemId===id)),i=>i.qty);
+const monthLeft=id=>{const it=iitem(id);return n(it&&it.monthMax)?Math.max(0,r2(n(it.monthMax)-monthUsed(id))):Infinity};
+const prLimit=id=>Math.min(stockOf(id).toBuy,monthLeft(id));
+
+/* ---------- HR-managed Internal BOQ sections ---------- */
+const canSec=sec=>!!sec&&(me.role==='PM'||(sec.owner==='HR'?me.role==='HR':me.role==='QS'));
+
 /* ---------- 8. USERS & SETTINGS ---------- */
 
 
 
+
 V.users=()=>{
-  const rows=S.users.map(u=>`<tr><td><b>${esc(u.name)}</b>${u.id===me.id?' <span class="pill info">You</span>':''}</td><td>${ROLES[u.role]}</td><td class="small muted">${{PM:'Everything',SE:'View all sections without prices (sub-contract amounts shown) · Site Team · sub-contract payment requests',QS:'Internal BOQ · Sub-contracts · Progress Claim',ST:'Stock · issued requests',PC:'Procurement · purchase orders · suppliers',FN:'Invoices · Receivables · Payables · view BOQ, claims, procurement'}[u.role]}</td><td class="act"><button class="lnk" data-act="editUser" data-id="${u.id}">Edit</button>${u.id!==me.id?`<button class="lnk bad" data-act="delUser" data-id="${u.id}">Delete</button>`:''}</td></tr>`).join('');
+  const rows=S.users.map(u=>`<tr><td><b>${esc(u.name)}</b>${u.id===me.id?' <span class="pill info">You</span>':''}</td><td>${ROLES[u.role]}</td><td class="small muted">${{PM:'Everything',SE:'View all sections without prices (sub-contract amounts shown) · Site Team · sub-contract payment requests',QS:'Internal BOQ · Sub-contracts · Progress Claim',ST:'Stock · issued requests',PC:'Procurement · purchase orders · suppliers',FN:'Invoices · Receivables · Payables · view BOQ, claims, procurement',HR:'Internal BOQ sections managed by HR (management cost, transport)'}[u.role]}</td><td class="act"><button class="lnk" data-act="editUser" data-id="${u.id}">Edit</button>${u.id!==me.id?`<button class="lnk bad" data-act="delUser" data-id="${u.id}">Delete</button>`:''}</td></tr>`).join('');
   const st=S.settings;
   return ph('Section 8 · Access control','Users & Settings','<button class="btn pri" data-act="addUser">+ User</button>')+
   `<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Can use</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -1056,8 +1108,8 @@ const A={
   delCItem:d=>{const it=citem(d.id);if(S.claims.some(c=>n(c.lines[it.id])>0))return toast('This item has claimed quantities and cannot be deleted','bad');delWith(`Delete <b>${esc(it.desc)}</b>?`,()=>S.citems=S.citems.filter(x=>x!==it))},
   // internal
   iScope:d=>{ui.iScope=d.id;render()},
-  addSection:()=>{const sc=scope(ui.iScope);const L=String.fromCharCode(65+S.sections.filter(x=>x.scopeId===sc.id).length);form(`New Section ${L} — ${sc.name}`,[{k:'name',l:'Section name (e.g. Materials, Labour)',req:true,full:true}],v=>{if(!v.name)return'Enter a name';S.sections.push({id:uid(),scopeId:sc.id,name:v.name})})},
-  editSection:d=>{const s=section(d.id);form('Rename section',[{k:'name',l:'Section name',v:s.name,req:true,full:true}],v=>{if(!v.name)return'Enter a name';s.name=v.name})},
+  addSection:()=>{const sc=scope(ui.iScope);const L=String.fromCharCode(65+S.sections.filter(x=>x.scopeId===sc.id).length);form(`New Section ${L} — ${sc.name}`,[{k:'name',l:me.role==='HR'?'Section name (e.g. Management cost, Transportation)':'Section name (e.g. Materials, Labour)',req:true,full:true},...(me.role==='PM'?[{k:'owner',l:'Managed by',t:'select',o:[['','QS — materials, labour'],['HR','HR — management cost, transport']],v:'',full:true}]:[])],v=>{if(!v.name)return'Enter a name';S.sections.push({id:uid(),scopeId:sc.id,name:v.name,owner:me.role==='HR'?'HR':me.role==='PM'?v.owner:''})})},
+  editSection:d=>{const s=section(d.id);form('Edit section',[{k:'name',l:'Section name',v:s.name,req:true,full:true},...(me.role==='PM'?[{k:'owner',l:'Managed by',t:'select',o:[['','QS — materials, labour'],['HR','HR — management cost, transport']],v:s.owner||'',full:true}]:[])],v=>{if(!v.name)return'Enter a name';s.name=v.name;if(me.role==='PM')s.owner=v.owner})},
   delSection:d=>{const s=section(d.id);if(S.iitems.some(x=>x.sectionId===s.id))return toast('Delete the items in this section first','bad');delWith(`Delete Section ${secLetter(s)} — <b>${esc(s.name)}</b>?`,()=>S.sections=S.sections.filter(x=>x!==s))},
   addIItem:d=>iItemForm({sectionId:d.id,stock:true}),
   editIItem:d=>iItemForm(iitem(d.id)),
@@ -1075,7 +1127,7 @@ const A={
   // claims
   pickClaim:d=>{ui.claimId=d.id;render()},
   newClaim:()=>{const no=Math.max(0,...S.claims.map(c=>c.no))+1;form(`New claim — IPC ${String(no).padStart(2,'0')}`,[{k:'date',l:'Valuation date',t:'date',v:today(),full:true}],v=>{const c={id:uid(),no,date:v.date||today(),status:'Draft',lines:{}};S.claims.push(c);ui.claimId=c.id},'Create')},
-  claimStatus:d=>{const c=S.claims.find(x=>x.id===ui.claimId);if(d.s==='Draft'&&invOfClaim(c.id))return toast('This claim is already invoiced and cannot be reopened','bad');if(d.s==='Draft'&&S.claims.some(x=>x.status==='Draft'&&x!==c))return toast('Another claim is already a draft','bad');c.status=d.s;save();render();toast(ipcNo(c)+' marked '+d.s.toLowerCase())},
+  claimStatus:d=>{const c=S.claims.find(x=>x.id===ui.claimId);if(d.s==='Submitted'){const R=claimRows(c),bad=S.citems.filter(it=>R[it.id].cum>n(it.qty)*(1+1e-6)+1e-9);if(bad.length)return toast('Cumulative is over 100% on item '+bad.map(cCode).join(', ')+'. Lower “This claim” before submitting.','bad')}if(d.s==='Draft'&&invOfClaim(c.id))return toast('This claim is already invoiced and cannot be reopened','bad');if(d.s==='Draft'&&S.claims.some(x=>x.status==='Draft'&&x!==c))return toast('Another claim is already a draft','bad');c.status=d.s;save();render();toast(ipcNo(c)+' marked '+d.s.toLowerCase())},
   fillClaim:()=>{const c=S.claims.find(x=>x.id===ui.claimId);const R=claimRows(c),pm=progressMap();let k=0;S.citems.forEach(it=>{const target=r2(n(it.qty)*(pm[it.id]||0)/100);const cur=Math.max(0,r2(target-R[it.id].prev));if(cur>0){c.lines[it.id]=cur;k++}else delete c.lines[it.id]});save();render();toast(`Filled ${k} items from latest site progress`)},
   delClaim:()=>{const c=S.claims.find(x=>x.id===ui.claimId);delWith(`Delete <b>${ipcNo(c)}</b>?`,()=>{S.claims=S.claims.filter(x=>x!==c);ui.claimId=null})},
   // stock
@@ -1097,6 +1149,9 @@ const A={
   prAccept:d=>{const p=S.prs.find(x=>x.id===d.id);p.status='Received';(p.hist=p.hist||[]).push({s:'Received',date:today(),by:me.name});save();closeModal();render();toast(prNo(p)+' accepted — create a PO when ready')},
   poNew:d=>poNewModal(d.id),
   poOpen:d=>poDetail(d.id),
+  attOpen:d=>attModal(d.t,d.l),
+  attGet:d=>attGet(d.id),
+  attDel:d=>{const f=(S.files||[]).find(x=>x.id===d.id);if(!f)return;confirmBox(`Delete <b>${esc(f.name)}</b>?`,async()=>{if(CLOUD){try{await api('fileDelete',{id:f.id})}catch(e){handleErr(e);return}}S.files=S.files.filter(x=>x!==f);if(!CLOUD)save();render();attModal(d.t,d.l);toast('File deleted')})},
   rpT:d=>{const P=period();ui.rp={t:d.id,from:P[0],to:P[1]};render()},
   printRep:()=>window.print(),
   catOpen:()=>catModal(),
@@ -1154,8 +1209,8 @@ const A={
 function showBackup(txt){modal(`<h3>Backup text</h3><p class="small muted">Select all and copy this text into a file.</p><textarea class="in" rows="10" id="bk" readonly>${esc(txt)}</textarea><div class="mact"><button class="btn" data-act="close">Close</button></div>`);const b=$('#bk');b.focus();b.select()}
 function cItemForm(it){const isNew=!it.id;form(isNew?'New Contract BOQ item':'Edit Contract BOQ item',[{k:'scopeId',l:'Scope of work',t:'select',o:scopeOpts(),v:it.scopeId,full:true},{k:'desc',l:'Description',v:it.desc,req:true,full:true},{k:'unit',l:'Unit',v:it.unit||'m2'},{k:'qty',l:'Quantity',t:'number',v:it.qty??''},{k:'rate',l:'Unit rate (USD)',t:'number',v:it.rate??'',full:true}],
   v=>{if(!v.desc)return'Enter a description';if(v.qty<=0)return'Quantity must be above zero';if(isNew)S.citems.push({id:uid(),...v});else Object.assign(it,v)})}
-function iItemForm(it){const isNew=!it.id;const sec=section(it.sectionId);form((isNew?'New item in ':'Edit item in ')+`Section ${secLetter(sec)} — ${sec.name}`,[{k:'code',l:'SAP / system code (optional — fills the rest from the item catalogue)',v:it.code||'',full:true},{k:'name',l:'Item name',v:it.name,req:true,full:true},{k:'unit',l:'Stock unit (e.g. pcs)',v:it.unit||'pcs'},{k:'qty',l:'Quantity in stock units',t:'number',v:it.qty??''},{k:'cu',l:'Priced per (blank = per stock unit; e.g. kg, m2)',v:it.cu||''},{k:'cpu',l:'Priced units in 1 stock unit (e.g. kg per pcs)',t:'number',v:it.cpu||''},{k:'rate',l:'Unit price (USD per priced unit)',t:'number',v:it.rate??''},{k:'stock',l:'Track in stock',t:'select',o:[['yes','Yes — material'],['no','No — labour / service']],v:it.stock===false?'no':'yes'}],
-  v=>{if(!v.name)return'Enter an item name';if(v.qty<=0)return'Quantity must be above zero';if(v.cu&&v.cpu<=0)return`Enter how many ${v.cu} are in 1 ${v.unit||'unit'}`;if(!v.cu)v.cpu=0;v.stock=v.stock==='yes';if(isNew)S.iitems.push({id:uid(),sectionId:sec.id,...v});else Object.assign(it,v)});catHook()}
+function iItemForm(it){const isNew=!it.id;const sec=section(it.sectionId);form((isNew?'New item in ':'Edit item in ')+`Section ${secLetter(sec)} — ${sec.name}`,[{k:'code',l:'SAP / system code (optional — fills the rest from the item catalogue)',v:it.code||'',full:true},{k:'name',l:'Item name',v:it.name,req:true,full:true},{k:'unit',l:'Stock unit (e.g. pcs)',v:it.unit||'pcs'},{k:'qty',l:'Quantity in stock units',t:'number',v:it.qty??''},{k:'cu',l:'Priced per (blank = per stock unit; e.g. kg, m2)',v:it.cu||''},{k:'cpu',l:'Priced units in 1 stock unit (e.g. kg per pcs)',t:'number',v:it.cpu||''},{k:'rate',l:'Unit price (USD per priced unit)',t:'number',v:it.rate??''},{k:'stock',l:'Track in stock',t:'select',o:[['yes','Yes — material'],['no','No — labour / service']],v:it.stock===false?'no':'yes'},...(me.role==='PM'?[{k:'monthMax',l:'Monthly purchase allowance (stock units per month, 0 = no limit)',t:'number',v:it.monthMax||0,full:true}]:[])],
+  v=>{if(!v.name)return'Enter an item name';if(n(v.monthMax)<0)return'The allowance cannot be negative';if(v.qty<=0)return'Quantity must be above zero';if(v.cu&&v.cpu<=0)return`Enter how many ${v.cu} are in 1 ${v.unit||'unit'}`;if(!v.cu)v.cpu=0;v.stock=v.stock==='yes';if(isNew)S.iitems.push({id:uid(),sectionId:sec.id,...v});else Object.assign(it,v)});catHook()}
 const ipcIdOf=v=>{const s=String(v||'').trim();const m=s.match(/\/d\/([\w-]+)/);return m?m[1]:s};
 function samplePeek(id,pf){const d=sampleIpc(),cs=d.contracts.filter(c=>c.src===id&&ipcProjOk({ipcProject:pf},c));if(!cs.length)return d.contracts.some(c=>c.src===id)?{name:id,contractors:[]}:{err:'The browser-only version can only read the sample IPC Sheets “demo-tile” and “demo-plaster”.'};
   const by={};cs.forEach(c=>{const x=by[c.contractor]=by[c.contractor]||{contractor:c.contractor,n:0,value:0};x.n++;x.value=r2(x.value+c.contractValue)});return{name:(d.works.find(w=>w.id===cs[0].work)||{}).name||id,contractors:Object.values(by)}}
@@ -1198,8 +1253,8 @@ document.addEventListener('submit',async e=>{if(e.target.id!=='lf')return;e.prev
     catch(err){b.disabled=false;b.textContent='Sign in';toast(err.message,'bad')}return}
   const u=S.users.find(x=>x.id===ui.pick);if(u&&$('#pin').value===String(u.pin)){me=u;try{sessionStorage.setItem(KEY+'-u',u.id)}catch(err){}ui.view='dash';render()}else toast('Wrong PIN','bad')});
 document.addEventListener('input',e=>{const t=e.target;
-  if(t.dataset.cq){const c=S.claims.find(x=>x.id===ui.claimId);if(!c||c.status!=='Draft')return;const v=n(t.value);if(v>0)c.lines[t.dataset.cq]=v;else delete c.lines[t.dataset.cq];save();updClaimRow(t.dataset.cq)}
-  else if(t.dataset.pq){prCtx.tmp[t.dataset.pq]=t.value;t.classList.toggle('over',n(t.value)>stockOf(t.dataset.pq).toBuy+1e-9);const c=Object.values(prCtx.tmp).filter(q=>n(q)>0).length;const el=$('#prcnt');if(el)el.textContent=`${c} item${c===1?'':'s'} in request`}
+  if(t.dataset.cq){const c=S.claims.find(x=>x.id===ui.claimId);if(!c||c.status!=='Draft')return;const ci=citem(t.dataset.cq),v=Math.round(n(t.value)/100*n(ci.qty)*1e6)/1e6;if(v>0)c.lines[t.dataset.cq]=v;else delete c.lines[t.dataset.cq];save();updClaimRow(t.dataset.cq)}
+  else if(t.dataset.pq){prCtx.tmp[t.dataset.pq]=t.value;t.classList.toggle('over',n(t.value)>prLimit(t.dataset.pq)+1e-9);const c=Object.values(prCtx.tmp).filter(q=>n(q)>0).length;const el=$('#prcnt');if(el)el.textContent=`${c} item${c===1?'':'s'} in request`}
   else if(t.id==='stq'){ui.stQ=t.value;const pos=t.selectionStart;render();const s=$('#stq');if(s){s.focus();s.setSelectionRange(pos,pos)}}});
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.sel){t.checked?ui.sel.add(t.dataset.sel):ui.sel.delete(t.dataset.sel);render()}
   else if(t.id==='rpFrom'||t.id==='rpTo'){ui.rp=Object.assign({},ui.rp,{t:'custom',[t.id==='rpFrom'?'from':'to']:t.value});render()}});
