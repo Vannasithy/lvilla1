@@ -1,0 +1,1816 @@
+<!doctype html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IPC Payment Claims</title>
+<script>
+/* ╔═══════════════ PROJECT SETTINGS — change only these 2 lines ═══════════════╗
+   One copy of this file per project (e.g. lvilla.html, anajak.html).          */
+const PROJECT_NAME = 'Park City';
+const WEBAPP_URL   = 'https://script.google.com/macros/s/AKfycbypP1ljOAGujv7xw6iIOC7Hcx-JI5Bq30DZRJAJ4wjYtjRMOY10l2Zx4dm1AImttrhDsA/exec';   // Apps Script Web App URL, ends with /exec
+/* ╚═════════════════════════════════════════════════════════════════════════════╝ */
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Light theme only (by request).
+   Layout: contract rail on the left, working sheet on the right; the IPC table keeps the
+   Excel's Previous (red) / Current (green) / Cumulative (blue) column bands. */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --surface-2:#F8FAFC; --ink:#152033; --muted:#5B6678; --line:#DCE2EA;
+  --navy:#1F3A5F; --navy-ink:#FFFFFF; --gold:#A8761C; --gold-soft:#F6EBD3;
+  --prev:#B5362A; --prev-bg:#FBECE9; --curr:#17834A; --curr-bg:#E3F3E8; --cum:#28507F; --cum-bg:#EAF0F8;
+  --sec-bg:#E4EBF4; --bad:#C0392B; --bad-bg:#FDECEA; --ok:#17834A; --warn:#9A6400; --warn-bg:#FFF4DB;
+  --focus:#2F6FD0;
+  --f-ui:"Kantumruy Pro","Khmer OS Battambang","Leelawadee UI",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:8px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-ui);font-size:14px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:12.5px;white-space:nowrap}
+.muted{color:var(--muted)}
+.kh{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.01em}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand img{height:34px;width:auto}
+.brand h1{font-size:15px;margin:0;font-weight:700;line-height:1.2}
+.brand h1 small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.spacer{flex:1}
+.who{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.who select,.who input{height:34px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);padding:0 8px}
+.who input{width:150px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:11.5px;font-weight:600;letter-spacing:.02em;border:1px solid transparent;white-space:nowrap}
+.chip.demo{background:var(--warn-bg);color:var(--warn)}
+.chip.live{background:var(--curr-bg);color:var(--curr)}
+.st-draft{background:var(--surface-2);color:var(--muted);border-color:var(--line)}
+.st-submitted{background:var(--warn-bg);color:var(--warn)}
+.st-approved{background:var(--curr-bg);color:var(--curr)}
+
+/* shell */
+.shell{display:grid;grid-template-columns:280px minmax(0,1fr);gap:16px;padding:16px;max-width:1600px;margin:0 auto}
+@media (max-width:900px){.shell{grid-template-columns:minmax(0,1fr)}}
+.rail{display:flex;flex-direction:column;gap:10px;min-width:0}
+.rail-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rail-h h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.search{height:34px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0 10px;width:100%}
+.clist{display:flex;flex-direction:column;gap:6px}
+.citem{all:unset;cursor:pointer;display:block;padding:10px 12px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+.citem:hover{border-color:var(--muted)}
+.citem.on{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--gold)}
+.citem b{display:block;font-size:13.5px}
+.citem .meta{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--curr)}
+
+.main{min-width:0;display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.head{padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 20px;align-items:start}
+@media (max-width:700px){.head{grid-template-columns:minmax(0,1fr)}}
+.head h2{margin:0;font-size:22px;line-height:1.2;text-wrap:balance}
+.head .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:4px 18px;margin-top:12px}
+.facts div{min-width:0}
+.facts dt{font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.facts dd{margin:0;font-weight:600;font-size:13.5px;overflow-wrap:anywhere}
+.big{text-align:right}
+@media (max-width:700px){.big{text-align:left}}
+.big .v{font-family:var(--f-num);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.big .l{font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 10px;overflow-x:auto}
+.tab{all:unset;cursor:pointer;padding:10px 12px;font-weight:600;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--gold)}
+.tab:focus-visible{outline:2px solid var(--focus)}
+
+.claimbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ipc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--line);font-family:var(--f-num);font-size:12px;font-weight:500}
+.ipc.on{border-color:var(--ink);background:var(--surface-2)}
+.ipc .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.ipc .dot.submitted{background:var(--warn)} .ipc .dot.approved{background:var(--ok)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--navy);color:var(--navy-ink);border-color:var(--navy)}
+.btn.go{background:var(--curr);color:#fff;border-color:var(--curr)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{height:28px;padding:0 10px;font-size:12px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:12px 16px}
+.toolbar .grow{flex:1;min-width:120px}
+.note{margin:12px 16px 0;padding:10px 12px;border-radius:6px;font-size:13px}
+.note.warn{background:var(--warn-bg);color:var(--warn)}
+.note.bad{background:var(--bad-bg);color:var(--bad)}
+.note.info{background:var(--cum-bg);color:var(--cum)}
+
+/* IPC table */
+.tw{overflow-x:auto;border-top:1px solid var(--line)}
+table.ipc-t{border-collapse:separate;border-spacing:0;width:100%;min-width:1180px;font-size:13px}
+.ipc-t th,.ipc-t td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:middle}
+.ipc-t thead th{background:var(--navy);color:var(--navy-ink);font-weight:600;font-size:12px;text-align:center;line-height:1.25;border-color:rgba(255,255,255,.18);border-right:1px solid rgba(255,255,255,.18)}
+.ipc-t thead th small{display:block;font-weight:500;opacity:.8;font-size:10.5px}
+.ipc-t thead th.g-prev{box-shadow:inset 0 -3px 0 #E0594A}
+.ipc-t thead th.g-curr{box-shadow:inset 0 -3px 0 #2FB56A}
+.ipc-t thead th.g-cum{box-shadow:inset 0 -3px 0 #6FA0DC}
+.ipc-t td.r{text-align:right}
+.ipc-t td.c{text-align:center}
+.ipc-t .stick{position:sticky;left:0;z-index:1;background:var(--surface)}
+.ipc-t thead .stick{z-index:2;background:var(--navy)}
+.ipc-t tr.sec td{background:var(--sec-bg);font-weight:700}
+.ipc-t tr.sec td.stick{background:var(--sec-bg)}
+.ipc-t td.prev{background:var(--prev-bg);color:var(--prev)}
+.ipc-t td.curr{background:var(--curr-bg);color:var(--curr)}
+.ipc-t td.cum{background:var(--cum-bg);color:var(--cum)}
+.ipc-t tfoot td{font-weight:700;background:var(--surface-2)}
+.ipc-t tfoot tr.grand td{border-top:2px solid var(--ink)}
+.ipc-t tfoot td.stick{background:var(--surface-2)}
+.pin{display:inline-flex;align-items:center;border:1.5px solid var(--curr);border-radius:5px;background:var(--surface);height:28px;padding:0 6px 0 2px}
+.pin input{width:58px;border:0;background:transparent;text-align:right;font-family:var(--f-num);font-size:12.5px;padding:0 2px;outline:none}
+.pin span{font-size:12px;color:var(--muted)}
+.pin.bad{border-color:var(--bad);background:var(--bad-bg)}
+.pin:focus-within{box-shadow:0 0 0 2px var(--focus)}
+.max{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-num)}
+.rmk{width:100%;min-width:120px;height:28px;border:1px solid var(--line);border-radius:5px;background:var(--surface);padding:0 6px;font-size:12.5px}
+.full{display:inline-block;font-size:10px;font-weight:700;color:var(--ok);letter-spacing:.04em}
+
+/* summary strip */
+.sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line)}
+@media (max-width:700px){.sum{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sum div{background:var(--surface);padding:12px 16px}
+.sum .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.sum .v{font-family:var(--f-num);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.sum .v.curr{color:var(--curr)}
+
+/* photos */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;padding:16px}
+.ph{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface-2);display:flex;flex-direction:column}
+.ph .img{aspect-ratio:4/3;max-width:100%;background:var(--line);display:flex;align-items:center;justify-content:center;position:relative}
+.ph .img img{width:100%;height:100%;object-fit:cover}
+.ph .n{position:absolute;top:8px;left:8px;background:var(--navy);color:var(--navy-ink);font-family:var(--f-num);font-size:12px;padding:2px 8px;border-radius:4px}
+.ph textarea{border:0;border-top:1px solid var(--line);background:var(--surface);padding:8px 10px;resize:vertical;min-height:58px;font-size:13px}
+.ph .cap{padding:8px 10px;font-size:13px;border-top:1px solid var(--line);background:var(--surface);min-height:40px}
+.ph .act{display:flex;justify-content:flex-end;padding:6px;gap:6px;background:var(--surface)}
+.drop{border:1.5px dashed var(--muted);border-radius:var(--r);aspect-ratio:4/3;max-width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;color:var(--muted);text-align:center;padding:12px;background:var(--surface)}
+.drop:hover,.drop.over{border-color:var(--curr);color:var(--curr)}
+.drop b{font-size:28px;line-height:1}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+
+/* history */
+table.ht{border-collapse:collapse;width:100%;min-width:900px;font-size:13px}
+.ht th{background:var(--navy);color:var(--navy-ink);font-size:12px;font-weight:600;padding:8px;text-align:center;line-height:1.25}
+.ht th small{display:block;font-weight:500;opacity:.8;font-size:10.5px}
+.ht td{padding:8px;border-bottom:1px solid var(--line)}
+.ht td.r{text-align:right}
+.ht tr.draft td{color:var(--muted);font-style:italic}
+.ht tfoot td{font-weight:700;background:var(--surface-2)}
+
+/* BOQ editor */
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px;padding:16px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld label{font-size:12px;font-weight:600;color:var(--muted)}
+.fld input,.fld select{height:34px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);padding:0 10px;min-width:0}
+.fld input:disabled{background:transparent;border-color:transparent;padding-left:0;font-weight:600}
+table.bq{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
+.bq th{background:var(--navy);color:var(--navy-ink);font-size:12px;font-weight:600;padding:8px;text-align:left}
+.bq td{padding:4px 6px;border-bottom:1px solid var(--line)}
+.bq tr.sec td{background:var(--sec-bg);font-weight:700}
+.bq input{width:100%;height:30px;border:1px solid var(--line);border-radius:5px;background:var(--surface);padding:0 8px;min-width:0}
+.bq input.n{text-align:right;font-family:var(--f-num);font-size:12.5px}
+.bq input:disabled{border-color:transparent;background:transparent}
+.bq td.r{text-align:right}
+.x{all:unset;cursor:pointer;color:var(--muted);padding:2px 6px;border-radius:4px}
+.x:hover{color:var(--bad);background:var(--bad-bg)}
+
+.log{padding:0 16px 16px;font-size:12.5px;color:var(--muted)}
+.log li{margin:2px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:8px;font-weight:600;font-size:13px;z-index:50;max-width:calc(100% - 32px)}
+.modal-bg{position:fixed;inset:0;background:rgba(10,15,25,.45);display:flex;align-items:center;justify-content:center;z-index:40;padding:16px}
+.modal{background:var(--surface);border-radius:10px;padding:18px;width:min(520px,100%);display:flex;flex-direction:column;gap:12px;border:1px solid var(--line)}
+.modal h3{margin:0;font-size:16px}
+.modal textarea,.modal input{border:1px solid var(--line);border-radius:6px;background:var(--surface-2);padding:8px 10px;min-height:36px}
+.modal .row{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+
+#print{display:none}
+@media (prefers-reduced-motion:no-preference){.citem,.btn,.tab{transition:border-color .15s,background .15s,color .15s}}
+
+/* ---------- PRINT (A4 landscape, paper is always white) ---------- */
+@page{size:A4 landscape;margin:9mm}
+@media print{
+  .app,.toast,.modal-bg{display:none!important}
+  #print{display:block;color:#000;background:#fff;font-family:var(--f-ui)}
+  html,body{background:#fff}
+  .pg{page-break-after:always;break-after:page}
+  .pg:last-child{page-break-after:auto;break-after:auto}
+  .p-hd{display:grid;grid-template-columns:150px 1fr 150px;align-items:center}
+  .p-hd img{height:48px}
+  .p-hd .t{text-align:center}
+  .p-hd .t b{display:block;font-size:17px;letter-spacing:.04em}
+  .p-hd .t span{font-size:13px;font-weight:600}
+  .p-title{text-align:center;font-weight:700;color:#1F3A5F;font-size:13.5px;margin:6px 0 8px;text-decoration:underline}
+  .p-info{display:grid;grid-template-columns:1fr 1fr;gap:1px 30px;font-size:11px;margin-bottom:6px}
+  .p-info div{display:flex;gap:6px}.p-info div span:first-child{min-width:150px;color:#333}
+  .p-info b{font-weight:700}
+  table.pt{border-collapse:collapse;width:100%;font-size:9.5px}
+  .pt th,.pt td{border:1px solid #555;padding:2px 4px}
+  .pt th{background:#1F3A5F!important;color:#fff!important;font-weight:600;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pt td.r{text-align:right;font-family:var(--f-num);font-size:9px;white-space:nowrap}
+  .pt td.c{text-align:center}
+  .pt tr.sec td{background:#DCE6F1!important;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pt td.pv{background:#FBE3DF!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pt td.cu{background:#DDF1E4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pt tr.tot td{font-weight:700}
+  .sig{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:22px;text-align:center;font-size:11px;break-inside:avoid}
+  .sig .ln{height:54px}
+  .pp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px}
+  .pp figure{margin:0;break-inside:avoid}
+  .pp .im{height:62mm;border:1px solid #777;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .pp img{width:100%;height:100%;object-fit:cover}
+  .pp figcaption{font-size:10.5px;padding:3px 2px;border:1px solid #777;border-top:0;min-height:22px}
+  .pp figcaption b{font-family:var(--f-num);margin-right:6px}
+}
+
+/* login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.lcard{width:min(400px,100%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 24px;display:flex;flex-direction:column;gap:14px}
+.lcard img{height:56px;width:auto;align-self:center}
+.lcard h2{margin:0;text-align:center;font-size:18px}
+.lcard .sub{text-align:center;color:var(--muted);font-size:12.5px;margin-top:-8px}
+.lcard input{height:40px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);padding:0 12px}
+.lcard .btn{height:40px}
+.demo-acc{font-size:12.5px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:10px 12px;line-height:1.6}
+.demo-acc code{font-family:var(--f-num);font-size:12px}
+/* user chip + nav */
+.uchip{display:flex;flex-direction:column;line-height:1.2;text-align:right}
+.uchip b{font-size:13px}
+.uchip span{font-size:11px;color:var(--muted)}
+.nav{display:flex;gap:4px}
+.nav .btn.on{background:var(--navy);color:var(--navy-ink);border-color:var(--navy)}
+.tr{display:inline-block;font-size:10px;font-weight:700;color:var(--cum);letter-spacing:.04em}
+.modal.wide{width:min(860px,100%);max-height:calc(100vh - 32px);overflow:auto}
+.modal .fld input,.modal .fld select,.modal .fld textarea{height:auto;min-height:36px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px}
+table.xt{border-collapse:collapse;width:100%;font-size:12.5px}
+.xt th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:6px;border-bottom:1px solid var(--line)}
+.xt td{padding:5px 6px;border-bottom:1px solid var(--line)}
+.xt td.r,.xt th.r{text-align:right}
+.xt tr.sec td{background:var(--sec-bg);font-weight:700}
+table.ut{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}
+.ut th{background:var(--navy);color:var(--navy-ink);font-size:12px;font-weight:600;padding:8px;text-align:left}
+.ut td{padding:8px;border-bottom:1px solid var(--line)}
+.ut tr.off td{color:var(--muted)}
+.hist{padding:0 16px 16px;font-size:12.5px;color:var(--muted)}
+.hist h4{margin:8px 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.hist li{margin:2px 0}
+.ph .img.pending img{opacity:.55}
+.ph .upl{position:absolute;right:8px;bottom:8px;background:var(--ink);color:var(--surface);font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:4px}
+@media (prefers-reduced-motion:no-preference){.ph .upl{animation:pulse 1.2s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.55}}
+/* work switcher + works page */
+.workbtn{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);padding:4px 10px;cursor:pointer;text-align:left}
+.workbtn b{font-size:13px}
+.workbtn span{font-size:10.5px}
+.workbtn:hover{border-color:var(--gold)}
+.works-wrap{max-width:1100px;margin:0 auto;padding:24px 16px;display:flex;flex-direction:column;gap:16px}
+.works-h{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between}
+.works-h h2{margin:0;font-size:20px}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.wcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
+.wcard:hover{border-color:var(--gold)}
+.wopen{all:unset;cursor:pointer;padding:16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.wopen:focus-visible{outline:2px solid var(--focus)}
+.wopen b{font-size:16px;line-height:1.3}
+.wstats{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:13px;color:var(--muted)}
+.wstats .num{font-size:15px;font-weight:600;color:var(--ink)}
+.wact{display:flex;gap:6px;justify-content:flex-end;padding:8px 12px;border-top:1px solid var(--line);background:var(--surface-2)}
+/* retention */
+.st-open{background:var(--cum-bg);color:var(--cum)}
+.rsched{margin:0 16px 14px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);display:flex;flex-direction:column;gap:8px}
+.rs-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:13px}
+.rs-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+.rs-l{min-width:80px;font-weight:600;display:flex;gap:6px;align-items:center}
+.rs-row input.num{width:76px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:0 8px;text-align:right}
+.retclaim{margin:14px 16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.retclaim .claimbar{background:var(--surface-2)}
+.retclaim textarea{border:1px solid var(--line);border-radius:6px;background:var(--surface-2);padding:8px 10px;resize:vertical}
+.retclaim .fld input.num{font-family:var(--f-num)}
+tr.rlink{cursor:pointer} tr.rlink:hover td{background:var(--surface-2)} tr.rlink:focus-visible{outline:2px solid var(--focus)}
+/* summary */
+table.sumt{min-width:1500px;font-size:12.5px}
+.sumt td{white-space:nowrap} .sumt td:nth-child(14){white-space:normal;min-width:200px}
+.sumt tr.retrow td{background:var(--cum-bg)}
+.sumside{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;padding:16px}
+.sumside h4{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sumside table.ht{min-width:0}
+</style>
+</head>
+<body>
+
+
+<div class="app" id="app"></div>
+<div id="print"></div>
+<script>
+/* =====================================================================
+   LHB IPC — Sub-contract Interim Payment Claim system  (v3: one Google Sheet file per work)
+   Backend: set API_URL to the deployed Google Apps Script Web App URL.
+   Leave empty to run in Demo mode (data kept in this browser only).
+   ===================================================================== */
+const CONFIG = {
+  DATABASES: /^https:\/\//.test(WEBAPP_URL) ? [{ key: 'p'+[...WEBAPP_URL].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7).toString(36), name: PROJECT_NAME, url: WEBAPP_URL }] : [],
+  API_URL: '',                 // leave empty — set WEBAPP_URL at the top instead
+  COMPANY: 'LAVISH HOME BUILD',
+  MAX_PHOTOS: 12,
+  PHOTO_MAX_PX: 1200,          // long side in px — sharp enough for the A4 photo page
+  PHOTO_QUALITY: 0.72,
+  PHOTO_PARALLEL: 3,           // photos uploaded at the same time
+  SESSION_HOURS: 6
+};
+const LOGO = 'data:image/webp;base64,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';
+const ROLES = {
+  SE: {en:'Site Engineer', kh:'វិស្វករការដ្ឋាន'},
+  QS: {en:'QS',            kh:'ផ្នែកបរិមាណ'},
+  VIEW:{en:'Viewer (Check app only)', kh:'អ្នកពិនិត្យ'}
+};
+const STATUS = {
+  draft:{en:'Draft',kh:'សេចក្តីព្រាង'},
+  submitted:{en:'Submitted',kh:'បានស្នើ'},
+  approved:{en:'Approved',kh:'បានអនុម័ត'}
+};
+const KEY = {users:'lhb-ipc-users-v5', works:'lhb-ipc-works-v5', data:w=>'lhb-ipc-data-v5-'+w, work:u=>'lhb-ipc-work-'+DB_SEL+'-'+u};      // last opened work, remembered per user
+const LS = {
+  get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}},
+  del(k){try{localStorage.removeItem(k)}catch(e){}}
+};
+const DBS = (CONFIG.DATABASES||[]).filter(d=>d && d.key && /^https:\/\//.test(d.url||''));
+let DB_SEL = (()=>{                                     // chosen database: ?db=key → last used → first in list
+  try{ const q=new URLSearchParams(location.search).get('db'); if(q && DBS.some(d=>d.key===q)){ LS.set('lhb-ipc-db-sel',q); return q; } }catch(e){}
+  const s=LS.get('lhb-ipc-db-sel',''); return DBS.some(d=>d.key===s) ? s : ((DBS[0]||{}).key||'');
+})();
+const curDb = () => DBS.find(d=>d.key===DB_SEL);
+LS.del('lhb-ipc-api');     // old "Connection settings" override — removed: the link in this file is the only one used
+const apiUrl = () => ((curDb()||{}).url || CONFIG.API_URL || '').trim();
+const isFramed = (()=>{try{return window.self!==window.top}catch(e){return true}})();
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = p => (p||'id')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const r2 = n => Math.round((+n||0)*100)/100;
+const r6 = n => Math.round((+n||0)*1e6)/1e6;
+const EPS = 0.00005;
+const money = n => { n=+n||0; if(Math.abs(n)<0.005) return '–'; return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+const usd = n => '$ '+money(n);
+const pct = f => { f=+f||0; if(Math.abs(f)<EPS) return '–'; return (f*100).toFixed(2)+'%'; };
+const pad3 = n => String(n).padStart(3,'0');
+const today = () => new Date().toISOString().slice(0,10);
+const fmtDate = d => { if(!d) return ''; const x=new Date(String(d).slice(0,10)+'T00:00:00'); return isNaN(x)?d:x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); };
+const clone = o => JSON.parse(JSON.stringify(o));
+async function sha256(t){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+const pwHash = (username,password) => sha256(String(username).trim().toLowerCase()+':'+password);
+
+/* ---------- seed data (BOQ from IPC sheet, SHOP HOUSE C - A18b [06]) ---------- */
+async function seed(){
+  const users=[
+    {id:'u_qs',    username:'qs',     name:'Sample QS',  role:'QS', active:true, hash:await pwHash('qs','lhb-qs-2026')},
+    {id:'u_dara',  username:'dara',   name:'សុខ ដារ៉ា',   role:'SE', active:true, hash:await pwHash('dara','1234')},
+    {id:'u_vichet',username:'vichet', name:'ចាន់ វិចិត្រ', role:'SE', active:true, hash:await pwHash('vichet','1234')}
+  ];
+  const it=(d,rate)=>({id:uid('it'),desc:d,unit:'set',qty:1,rate});
+  const boq=()=>[
+    {id:uid('s'),no:'I',  title:'ការងារជាន់ផ្ទាល់ដី', items:[it('ការ៉ូបាតផ្ទះ (60x60)',211.41),it('ការ៉ូច្រកចូល 60x120',12.09),it('ការ៉ូជើងជញ្ជាំង',63.04),it('ការ៉ូជើងជណ្តើរ 100mm',10),it('ការ៉ូជញ្ជាំងចង្រ្កានបាយ',12.18),it('ការ៉ូជញ្ជាំងខាងក្រៅ',80.745),it('ការ៉ូបាតបន្ទប់ទឹក',9),it('ការ៉ូជញ្ជាំងបន្ទប់ទឹក',58.66)]},
+    {id:uid('s'),no:'II', title:'ការងារជាន់ឡៅតឿ', items:[it('ការ៉ូបាតផ្ទះ (60x60)',82.5),it('ការ៉ូជើងជញ្ជាំង',25.08),it('ការ៉ូជើងជណ្តើរ 100mm',10),it('ការ៉ូបាតបន្ទប់ទឹក',10.593),it('ការ៉ូជញ្ជាំងបន្ទប់ទឹក',67.716)]},
+    {id:uid('s'),no:'III',title:'ការងារជាន់ទី1', items:[it('ការ៉ូបាតផ្ទះ (60x60)',215.82),it('ការ៉ូជើងជញ្ជាំង',47.8),it('ការ៉ូជើងជណ្តើរ 100mm',10.7),it('ការ៉ូវេរ៉ង់ដា ខាងមុខ (60x60)',13.695),it('ការ៉ូជើងជញ្ជាំង Balcony',10.6),it('ការ៉ូបាតបន្ទប់ទឹក',28.044),it('ការ៉ូជញ្ជាំងបន្ទប់ទឹក',176.669)]},
+    {id:uid('s'),no:'IV', title:'ការងារជាន់ទី2', items:[it('ការ៉ូបាតផ្ទះ (60x60)',155.2),it('ការ៉ូជើងជញ្ជាំង',29.6),it('ការ៉ូជាន់ទែរ៉ាស់(60x60)',92.16),it('ការ៉ូវេរ៉ង់ដា ខាងមុខ (60x60)',7.56),it('ការ៉ូជើងជញ្ជាំង WA/TR/Balcony',24.6),it('ការ៉ូបាតបន្ទប់ទឹក',17.823),it('ការ៉ូជញ្ជាំងបន្ទប់ទឹក',100.76),it('សាបផ្ទៃជាន់ទី2',1.68)]},
+    {id:uid('s'),no:'V',  title:'ការងារជាន់ដំបូល', items:[it('ការងារសាបផ្ទៃដំបូល',0)]},
+    {id:uid('s'),no:'VI', title:'ការងារម៉ាប', items:[it('ការងារម៉ាបជណ្តើរ',407.97647),it('ការងារម៉ាបស៊ុមទ្វារ',58),it('ការងារម៉ាបឡាបូ',39.3)]},
+    {id:uid('s'),no:'VII',title:'ការងារកៅស៊ូ ការពារការ៉ូ និងម៉ាប', items:[it('ការងារក្រាលកៅស៊ូ',8)]}
+  ];
+  const base={project:'The Anajak',contractor:'ខឿន សុឃាង',workType:'ការងារការ៉ូ (ពលកម្ម)',terms:'ពីរសប្តាហ៍',retention:0.10,transfers:[],engineerLog:[]};
+  const c1=Object.assign(clone(base),{id:'ct_a18b06',projectCode:'HE2026007',location:'SHOP HOUSE C - A18b [06]',houseType:'SHOP HOUSE C',block:'A18b',houseNo:'06',engineerId:'u_dara',sections:boq(),retSchedule:[{pct:1,months:12}]});
+  const c2=Object.assign(clone(base),{id:'ct_a18b07',projectCode:'HE2026008',location:'SHOP HOUSE C - A18b [07]',houseType:'SHOP HOUSE C',block:'A18b',houseNo:'07',engineerId:'u_vichet',sections:boq(),sample:true,
+    retSchedule:[{pct:0.5,months:3},{pct:0.5,months:12}]});
+  const full={}; c2.sections.forEach(s=>s.items.forEach(x=>{ if(x.rate>0) full[x.id]=1; }));
+  const items=c1.sections.flatMap(s=>s.items);
+  const l1={}, l2={};
+  [0,2,8,9].forEach(i=>l1[items[i].id]=0.5);
+  [0,2,8,9].forEach(i=>l2[items[i].id]=0.3);
+  [16,17].forEach(i=>l2[items[i].id]=0.4);
+  const c3={id:'ct_gl44a',project:'The Anajak',projectCode:'IPC-PLS-001',contractor:'សំ សារី',location:'Garden Link Villa - A32b [44A]',houseType:'Garden Link Villa',block:'A32b',houseNo:'44A',workType:'ការងារបូកក្នុងក្រៅ (ពលកម្ម)',
+    terms:'ពីរសប្តាហ៍',retention:0.10,engineerId:'u_vichet',transfers:[],engineerLog:[],sample:true,sections:[
+    {id:uid('s'),no:'I',title:'ការងារជាន់ផ្ទាល់ដី',items:[it('ការងារបូកក្នុង',140.2),it('ការងារបូកជាតជណ្តើរ',24),it('ការងារចាប់ជ្រុង និង ស៊ុមទ្វារបង្អួច',87.43)]},
+    {id:uid('s'),no:'II',title:'ការងារជាន់ទី2',items:[it('ការងារបូកក្នុង',144.43),it('ការងារចាប់ជ្រុង និង ស៊ុមទ្វារបង្អួច',43.2)]},
+    {id:uid('s'),no:'III',title:'ការងារបូកក្រៅ',items:[it('ការងារបូកក្រៅ និង ចាក់សាប',428.975),it('ការងារចាប់ជ្រុង និង ស៊ុមទ្វារបង្អួច',104.21),it('ការងារចាប់ជ្រើ ស៊ុមទ្វារបង្អួច',26.5),it('ការងារកាត់ឡុងជញ្ជាំង',61.05),it('ការងារតម្លើងទ្វារ និង រុះសំរាត',100),it('ទឹកប្រាក់បន្ថែម',200)]}]};
+  const claims=[
+    {id:uid('cl'),contractId:c1.id,seq:1,ipcNo:'IPC_HE2026007-001',date:'2026-09-12',status:'approved',sample:true,lines:l1,remarks:{},photos:[],
+     preparedBy:'សុខ ដារ៉ា',siteManager:'ផាន សុផេន',approvedBy:'Sample QS',
+     log:[{at:'2026-09-12T09:00:00Z',by:'សុខ ដារ៉ា',role:'SE',action:'submitted'},{at:'2026-09-14T09:00:00Z',by:'Sample QS',role:'QS',action:'approved'}]},
+    {id:uid('cl'),contractId:c1.id,seq:2,ipcNo:'IPC_HE2026007-002',date:'2026-09-26',status:'draft',sample:true,lines:l2,remarks:{},photos:[],preparedBy:'សុខ ដារ៉ា',siteManager:'ផាន សុផេន',log:[]},
+    {id:uid('cl'),contractId:c2.id,seq:1,ipcNo:'IPC_HE2026008-001',date:'2026-03-02',status:'approved',sample:true,lines:full,remarks:{},photos:[],
+     preparedBy:'ចាន់ វិចិត្រ',siteManager:'ផាន សុផេន',approvedBy:'Sample QS',
+     log:[{at:'2026-03-02T09:00:00Z',by:'ចាន់ វិចិត្រ',role:'SE',action:'submitted'},{at:'2026-03-05T09:00:00Z',by:'Sample QS',role:'QS',action:'approved'}]}
+  ];
+  return {users,
+    works:[{id:'w_tile',name:'ការងារការ៉ូ · Tile'},{id:'w_plaster',name:'ការងារបូក · Plaster'}],
+    data:{w_tile:{contracts:[c1,c2],claims},w_plaster:{contracts:[c3],claims:[]}}};
+}
+
+/* ---------- session ---------- */
+const SESSION_KEY = () => 'lhb-ipc-session-'+(DB_SEL||'x');   // one sign-in per database
+let SESSION = LS.get(SESSION_KEY(),null);
+if(SESSION && (!SESSION.exp || SESSION.exp<Date.now())) SESSION=null;
+const me = () => SESSION && SESSION.user;
+const isQS = () => !!me() && me().role==='QS';
+function setSession(s){ SESSION=s; if(s) LS.set(SESSION_KEY(),s); else LS.del(SESSION_KEY()); }
+
+/* ---------- data layer: Apps Script backend or local demo ---------- */
+const DB = {users:[],contracts:[],claims:[]};
+let WORKS = [];                                   // works this user can open
+function saveLocal(){
+  const ok = LS.set(KEY.users,DB.users) && (!UI.work || LS.set(KEY.data(UI.work),{contracts:DB.contracts,claims:DB.claims}));
+  if(!ok) toast('Browser storage is full or blocked. Changes stay until you close this page.');
+}
+async function demoInit(){
+  if(LS.get(KEY.users,null) && LS.get(KEY.works,null)) return;
+  const d=await seed(); LS.set(KEY.users,d.users); LS.set(KEY.works,d.works);
+  Object.entries(d.data).forEach(([w,v])=>LS.set(KEY.data(w),v));
+}
+const curWork = () => WORKS.find(w=>w.id===UI.work);
+async function call(action,payload){
+  const res=await fetch(apiUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(Object.assign({action,token:SESSION?SESSION.token:'',work:UI.work||''},payload||{}))});
+  const j=await res.json();
+  if(j.authExpired){ signOut('Your sign-in expired. Please sign in again.'); throw new Error('Signed out'); }
+  if(!j.ok) throw new Error(j.error||'Server error');
+  return j;
+}
+/* works list (master) */
+async function loadWorks(){
+  if(apiUrl()){ const j=await call('works'); WORKS=j.works||[]; DB.users=j.users||[]; return; }
+  await demoInit(); DB.users=LS.get(KEY.users,[]);
+  WORKS=LS.get(KEY.works,[]).map(w=>{
+    const d=LS.get(KEY.data(w.id),{contracts:[],claims:[]}); const mine={};
+    d.contracts.forEach(c=>{ if(c.engineerId===me().id) mine[c.id]=1; });
+    return {id:w.id,name:w.name,folderUrl:w.folderUrl||'',houses:d.contracts.length,mine:Object.keys(mine).length,
+      pending:d.claims.filter(cl=>cl.status==='submitted'&&(isQS()||mine[cl.contractId])).length,
+      drafts:d.claims.filter(cl=>cl.status==='draft'&&mine[cl.contractId]).length};
+  }).filter(w=>isQS()||w.mine>0);
+}
+async function createWork(name,folder){
+  if(apiUrl()){ const j=await call('createWork',{name,folder}); WORKS=j.works; DB.users=j.users||DB.users; return j.created; }
+  const ws=LS.get(KEY.works,[]);
+  if(ws.some(w=>w.name.toLowerCase()===name.toLowerCase())) throw new Error('A work named "'+name+'" already exists');
+  const id=uid('w'); ws.push({id,name,folderUrl:folder||''}); LS.set(KEY.works,ws); LS.set(KEY.data(id),{contracts:[],claims:[]});
+  await loadWorks(); return id;
+}
+async function moveWork(id,folder){
+  if(apiUrl()){ const j=await call('moveWork',{workId:id,folder}); WORKS=j.works; return; }
+  const ws=LS.get(KEY.works,[]); const w=ws.find(x=>x.id===id); if(w) w.folderUrl=folder; LS.set(KEY.works,ws); await loadWorks();
+}
+const isFolderLink = t => /drive\.google\.com\/(drive\/)?(u\/\d+\/)?folders\/[\w-]{10,}/.test(t) || /^[\w-]{20,}$/.test(t);
+async function renameWork(id,name){
+  if(apiUrl()){ const j=await call('renameWork',{workId:id,name}); WORKS=j.works; return; }
+  const ws=LS.get(KEY.works,[]); const w=ws.find(x=>x.id===id); if(w) w.name=name; LS.set(KEY.works,ws); await loadWorks();
+}
+/* data of the chosen work */
+async function loadAll(){
+  if(!apiUrl()){
+    const d=LS.get(KEY.data(UI.work),{contracts:[],claims:[]});
+    DB.users=LS.get(KEY.users,[]); DB.contracts=d.contracts||[]; DB.claims=d.claims||[]; return;
+  }
+  const j=await call('load');
+  DB.users=j.users||[]; DB.contracts=j.contracts||[]; DB.claims=j.claims||[];
+}
+function upsertLocal(list,obj){ const i=DB[list].findIndex(x=>x.id===obj.id); if(i<0) DB[list].push(obj); else DB[list][i]=obj; }
+function stampClaim(cl){
+  cl.updatedAt=new Date().toISOString(); const c=contractOf(cl);
+  if(cl.type==='RET'){ const a=+cl.amount||0, d=+cl.deduction||0; cl.summary={contractValue:c?contractValue(c):0,current:a,retention:0,received:r2(a-d),cumulative:0,balance:0,deduction:d}; return; }
+  cl.summary=c?summarize(c,cl):null;
+}
+async function persistContract(c){
+  c.updatedAt=new Date().toISOString();
+  if(apiUrl()) await call('saveContract',{contract:c});
+  upsertLocal('contracts',c); if(!apiUrl()) saveLocal();
+}
+async function persistClaim(cl){
+  stampClaim(cl);
+  if(apiUrl()){ const j=await call('saveClaim',{claim:cl}); if(j.claim) Object.assign(cl,j.claim); }
+  upsertLocal('claims',cl); if(!apiUrl()) saveLocal();
+}
+async function persistBatch(contracts,claims){
+  contracts.forEach(c=>c.updatedAt=new Date().toISOString());
+  contracts.forEach(c=>upsertLocal('contracts',c));   // claims need their contract for the summary
+  claims.forEach(stampClaim);
+  if(apiUrl()) await call('saveBatch',{contracts,claims});
+  claims.forEach(cl=>upsertLocal('claims',cl)); if(!apiUrl()) saveLocal();
+}
+async function removeClaim(cl){
+  if(apiUrl()) await call('deleteClaim',{id:cl.id});
+  DB.claims=DB.claims.filter(x=>x.id!==cl.id); if(!apiUrl()) saveLocal();
+}
+async function uploadPhoto(dataUrl,name){
+  if(!apiUrl()) return dataUrl;
+  return (await call('uploadPhoto',{name,dataUrl})).url;
+}
+/* users */
+async function login(username,password){
+  username=username.trim();
+  if(apiUrl()){
+    const j=await call('login',{username,password});
+    setSession({token:j.token,user:j.user,exp:Date.now()+CONFIG.SESSION_HOURS*3600e3}); return;
+  }
+  await demoInit(); DB.users=LS.get(KEY.users,[]);
+  const u=DB.users.find(x=>x.username.toLowerCase()===username.toLowerCase());
+  if(!u || u.hash!==await pwHash(u.username,password)) throw new Error('Wrong username or password');
+  if(u.active===false) throw new Error('This account is deactivated. Ask QS.');
+  setSession({token:'demo',user:{id:u.id,username:u.username,name:u.name,role:u.role},exp:Date.now()+CONFIG.SESSION_HOURS*3600e3});
+}
+async function saveUser(u,password){
+  if(apiUrl()){ const j=await call('saveUser',{user:u,password:password||''}); DB.users=j.users; return; }
+  if(DB.users.some(x=>x.id!==u.id && x.username.toLowerCase()===u.username.toLowerCase())) throw new Error('Username "'+u.username+'" is already taken');
+  const ex=DB.users.find(x=>x.id===u.id);
+  const rec=ex||{}; Object.assign(rec,u);
+  if(password) rec.hash=await pwHash(rec.username,password);
+  if(!ex) DB.users.push(rec);
+  saveLocal();
+}
+async function changeMyPassword(oldPw,newPw){
+  if(apiUrl()){ await call('changePassword',{oldPassword:oldPw,newPassword:newPw}); return; }
+  const u=DB.users.find(x=>x.id===me().id);
+  if(!u || u.hash!==await pwHash(u.username,oldPw)) throw new Error('Current password is wrong');
+  u.hash=await pwHash(u.username,newPw); saveLocal();
+}
+
+/* ---------- house location: House type · Block · House No. ---------- */
+function splitLoc(s){
+  s=String(s||'').trim();
+  let m=s.match(/^(.*?)\s*[-–]\s*([^\s\[\]]+)\s*\[\s*#?([^\]]+)\]\s*$/) || s.match(/^(.*\S)\s+([^\s\[\]]+)\s*\[\s*#?([^\]]+)\]\s*$/);
+  return m?{houseType:m[1].trim(),block:m[2].trim(),houseNo:m[3].trim()}:{houseType:'',block:'',houseNo:''};
+}
+const composeLoc = c => [c.houseType, (c.block||c.houseNo)?`${c.block||''}${c.houseNo?` [${c.houseNo}]`:''}`.trim():''].filter(Boolean).join(' - ');
+function houseFields(c){ if(c.block||c.houseNo||c.houseType) return {houseType:c.houseType||'',block:c.block||'',houseNo:c.houseNo||''}; return splitLoc(c.location); }
+const natCmp = (a,b) => String(a||'').localeCompare(String(b||''),undefined,{numeric:true,sensitivity:'base'});
+const houseSort = (a,b) => { const x=houseFields(a), y=houseFields(b); return natCmp(x.block,y.block)||natCmp(x.houseNo,y.houseNo)||natCmp(x.houseType,y.houseType)||natCmp(a.contractor,b.contractor); };
+
+/* ---------- calculations ---------- */
+const contractOf = cl => DB.contracts.find(c=>c.id===cl.contractId);
+const claimsOf = c => DB.claims.filter(x=>x.contractId===c.id && x.type!=='RET').sort((a,b)=>a.seq-b.seq);   // IPC claims only
+const userName = id => (DB.users.find(u=>u.id===id)||{}).name || '—';
+const engineers = () => DB.users.filter(u=>u.role==='SE' && u.active!==false);
+const capOf = it => it.cap==null ? 1 : +it.cap;          // max cumulative % (below 100% after a contractor transfer)
+const itemAmt = it => r2((+it.qty||0)*(+it.rate||0));
+const allItems = c => c.sections.flatMap(s=>s.items);
+const contractValue = c => r2(allItems(c).reduce((t,it)=>t+itemAmt(it),0));
+const transferredOut = c => r2(allItems(c).reduce((t,it)=>t+(it.cap==null?0:itemAmt(it)*(1-capOf(it))),0));
+const netValue = c => r2(contractValue(c)-transferredOut(c));
+const approvedPct = (c,itemId) => claimsOf(c).filter(x=>x.status==='approved').reduce((s,x)=>s+(+x.lines[itemId]||0),0);
+/* Previous = all APPROVED claims before this one (current claim excluded). */
+const prevPct = (c,cl,itemId) => claimsOf(c).filter(x=>x.status==='approved'&&x.seq<cl.seq).reduce((s,x)=>s+(+x.lines[itemId]||0),0);
+function calc(c,cl){
+  const out={sections:[],tot:{amt:0,prev:0,curr:0,cum:0}};
+  c.sections.forEach(sec=>{
+    const S={sec,rows:[],amt:0,prev:0,curr:0,cum:0};
+    sec.items.forEach(it=>{
+      const amt=itemAmt(it), pp=prevPct(c,cl,it.id), cp=+cl.lines[it.id]||0;
+      const row={it,amt,pp,cp,cumP:pp+cp,prev:r2(amt*pp),curr:r2(amt*cp),room:Math.max(0,capOf(it)-pp)};
+      row.cum=r2(row.prev+row.curr);
+      S.rows.push(row); S.amt+=amt; S.prev+=row.prev; S.curr+=row.curr; S.cum+=row.cum;
+    });
+    out.sections.push(S);
+    ['amt','prev','curr','cum'].forEach(k=>out.tot[k]+=S[k]);
+  });
+  const t=out.tot, rp=+c.retention||0;
+  t.ret={amt:r2(t.amt*rp),prev:r2(t.prev*rp),curr:r2(t.curr*rp),cum:r2(t.cum*rp)};
+  t.net={amt:r2(t.amt-t.ret.amt),prev:r2(t.prev-t.ret.prev),curr:r2(t.curr-t.ret.curr),cum:r2(t.cum-t.ret.cum)};
+  return out;
+}
+function summarize(c,cl){
+  const t=calc(c,cl).tot, nv=netValue(c);
+  return {contractValue:r2(t.amt),transferredOut:transferredOut(c),current:r2(t.curr),retention:t.ret.curr,received:t.net.curr,cumulative:r2(t.cum),balance:r2(nv-t.cum)};
+}
+function approvedProgress(c){
+  const v=netValue(c); if(!v) return 0;
+  return allItems(c).reduce((s,it)=>s+itemAmt(it)*approvedPct(c,it.id),0)/v;
+}
+const hasRemaining = c => allItems(c).some(it=>itemAmt(it)>0 && capOf(it)-approvedPct(c,it.id)>EPS);
+
+/* ---------- UI state & permissions ---------- */
+const UI = { retId:null, retFilter:'all', work:SESSION?LS.get(KEY.work(SESSION.user.id),''):'', view:'contracts', contractId:null, claimId:null, tab:LS.get('lhb-ipc-tab','ipc'), q:'', dirty:false, boqDraft:null, delArm:null };
+const myContracts = () => isQS() ? DB.contracts : DB.contracts.filter(c=>c.engineerId===me().id);
+const owns = c => !!c && !!me() && c.engineerId===me().id;
+const can = {
+  editCurrent: (cl,c) => !isQS() && owns(c) && cl && cl.status==='draft',
+  newClaim: c => !isQS() && owns(c) && !claimsOf(c).some(x=>x.status!=='approved') && hasRemaining(c),
+  review: cl => isQS() && cl && cl.status==='submitted',
+  editBoq: () => isQS()
+};
+const curContract = () => myContracts().find(c=>c.id===UI.contractId);
+const curClaim = () => DB.claims.find(x=>x.id===UI.claimId);
+
+function toast(msg){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg; t.setAttribute('role','status');
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2800);
+}
+async function guard(fn){
+  document.body.style.cursor='progress';
+  try{ await fn(); } catch(e){ if(e.message!=='Signed out') toast('Not saved: '+e.message); console.error(e); }
+  finally{ document.body.style.cursor=''; }
+}
+
+/* ---------- login ---------- */
+function renderLogin(msg){
+  const live=!!apiUrl();
+  $('#app').innerHTML=`<div class="login"><form class="lcard" id="lf" autocomplete="on">
+    <img src="${LOGO}" alt="Lavish Home Build">
+    <h2>Sub-contract Payment Claims</h2>
+    <div class="sub">${esc(PROJECT_NAME)} · តារាងស្នើសុំទូទាត់ប្រាក់ការងារសាងសង់ · IPC</div>
+    ${msg?`<div class="note bad" style="margin:0">${esc(msg)}</div>`:''}
+    ${DBS.length>1 ? `<div class="fld"><label for="ldb">Project / database · គម្រោង</label><select id="ldb">${DBS.map(d=>`<option value="${esc(d.key)}" ${d.key===DB_SEL?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>`:''}
+    <div class="fld"><label for="lu">Username · ឈ្មោះអ្នកប្រើ</label><input id="lu" autocomplete="username" autocapitalize="none" required></div>
+    <div class="fld"><label for="lp">Password · ពាក្យសម្ងាត់</label><input id="lp" type="password" autocomplete="current-password" required></div>
+    <div id="lerr" class="note bad" style="margin:0" hidden></div>
+    <button class="btn pri" id="lgo" type="submit">Sign in · ចូល</button>
+    ${live?'':`<div class="demo-acc"><b>Demo mode.</b> Sample accounts:<br>QS: <code>qs</code> / <code>lhb-qs-2026</code><br>Engineer A18b [06]: <code>dara</code> / <code>1234</code><br>Engineer A18b [07]: <code>vichet</code> / <code>1234</code></div>`}
+    <button class="btn sm" type="button" id="lset" style="align-self:center">Connection</button>
+  </form></div>`;
+  $('#lu').focus();
+  $('#lset').onclick=openSettings;
+  const ldb=$('#ldb'); if(ldb) ldb.onchange=()=>{ DB_SEL=ldb.value; LS.set('lhb-ipc-db-sel',DB_SEL); SESSION=LS.get(SESSION_KEY(),null); UI.work=''; boot(); };
+  $('#lf').onsubmit=async e=>{
+    e.preventDefault(); const b=$('#lgo'), er=$('#lerr'); b.disabled=true; er.hidden=true;
+    try{ await login($('#lu').value,$('#lp').value); UI.work=LS.get(KEY.work(me().id),''); UI.contractId=null; UI.view='contracts'; await enterApp(); toast('Signed in as '+me().name); }
+    catch(ex){ er.textContent=ex.message; er.hidden=false; b.disabled=false; $('#lp').select(); }
+  };
+}
+function signOut(msg){ setSession(null); WORKS=[]; UI.work=''; UI.contractId=null; UI.claimId=null; UI.view='contracts'; UI.dirty=false; UI.boqDraft=null; renderLogin(msg); }
+
+/* ---------- works page ---------- */
+async function enterApp(){
+  await loadWorks();
+  if(UI.work && curWork()){ await loadAll(); render(); }
+  else { UI.work=''; renderWorks(); }
+}
+async function showWorks(){ UI.work=''; LS.set(KEY.work(me().id),''); UI.contractId=null; UI.claimId=null; UI.boqDraft=null; await loadWorks(); renderWorks(); }
+async function openWork(id){
+  UI.work=id; LS.set(KEY.work(me().id),id); UI.contractId=null; UI.claimId=null; UI.boqDraft=null; UI.view='contracts';
+  $('#app').innerHTML='<div class="empty" style="padding:60px">Opening '+esc((curWork()||{}).name||'')+'…</div>';
+  try{ await loadAll(); render(); }catch(e){ if(e.message!=='Signed out'){ toast(e.message); UI.work=''; renderWorks(); } }
+}
+function renderWorks(){
+  const u=me(), live=!!apiUrl();
+  $('#app').innerHTML=`
+  <header class="top"><div class="top-in">
+    <div class="brand"><img src="${LOGO}" alt="Lavish Home Build">
+      <h1>Sub-contract Payment Claims<small>${esc(PROJECT_NAME)} · តារាងស្នើសុំទូទាត់ប្រាក់ការងារសាងសង់ · IPC</small></h1></div>
+    <span class="chip ${live?'live':'demo'}">${live?'Connected':'Demo mode'}</span>
+    <div class="spacer"></div>
+    <div class="who">
+      <div class="uchip"><b>${esc(u.name)}</b><span>${ROLES[u.role].en} · ${ROLES[u.role].kh}</span></div>
+      <button class="btn sm" id="btnPw">Password</button>
+      ${isQS()?'<button class="btn sm" id="btnSettings">Settings</button>':''}
+      <button class="btn sm" id="btnOut">Sign out</button>
+    </div>
+  </div></header>
+  <div class="works-wrap">
+    <div class="works-h"><div><h2>Choose a work · ជ្រើសរើសការងារ</h2>
+      <div class="muted">${isQS()?'Each work is its own Google Sheet file. Open one to manage its houses and claims.':'Works where you have houses. Open one to make or check your claims.'}</div></div>
+      ${isQS()?'<button class="btn pri" id="btnNewW">+ New work</button>':''}</div>
+    <div class="wgrid">
+      ${WORKS.length?WORKS.map(w=>`<div class="wcard">
+        <button class="wopen" data-w="${w.id}">
+          <b>${esc(w.name)}</b>
+          <span class="wstats">
+            <span><span class="num">${isQS()?w.houses:w.mine}</span> ${isQS()?'houses':'my houses'}</span>
+            ${w.pending?`<span class="chip st-submitted">${w.pending} waiting approval</span>`:''}
+            ${w.drafts?`<span class="chip st-draft">${w.drafts} draft</span>`:''}
+          </span>
+        </button>
+        ${isQS()?`<div class="wact">${w.folderUrl?`<a class="btn sm" href="${esc(w.folderUrl)}" target="_blank" rel="noopener">Open folder</a>`:''}${w.url?`<a class="btn sm" href="${esc(w.url)}" target="_blank" rel="noopener">Open Sheet</a>`:''}<button class="btn sm" data-mv="${w.id}">Move to folder</button><button class="btn sm" data-rn="${w.id}">Rename</button></div>`:''}
+      </div>`).join(''):`<div class="panel empty">${isQS()?'No works yet. Click “+ New work” to create the first one (e.g. ការងារការ៉ូ · Tile).':'You have no houses in any work yet. Ask QS to assign your houses.'}</div>`}
+    </div>
+  </div>`;
+  $('#btnOut').onclick=()=>signOut();
+  $('#btnPw').onclick=openChangePassword;
+  if($('#btnSettings')) $('#btnSettings').onclick=openSettings;
+  document.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>openWork(b.dataset.w));
+  if($('#btnNewW')) $('#btnNewW').onclick=()=>formModal('New work · ការងារថ្មី',
+    `<div class="fld"><label for="wn">Work name</label><input id="wn" placeholder="e.g. ការងារពិដាន · THE Hill Park"></div>
+     <div class="fld"><label for="wf">Project folder in Google Drive (link)</label><input id="wf" placeholder="https://drive.google.com/drive/folders/…"></div>
+     <div class="muted" style="font-size:13px">${live?'The Sheet file “LHB_IPC_&lt;name&gt;” is created in this folder, and photos go to “IPC Photos” inside it. Open the folder in Drive and copy the link from the address bar. Leave empty to use the master file’s folder.':'Demo: the work is kept in this browser.'}</div>`,
+    'Create work', async bg=>{ const n=bg.querySelector('#wn').value.trim(), f=bg.querySelector('#wf').value.trim(); if(n.length<2) return 'Enter the work name.';
+      if(f && !isFolderLink(f)) return 'That is not a Drive folder link. Open the folder in Google Drive and copy the address bar.';
+      const id=await createWork(n,f); toast('Work created'); if(id) setTimeout(()=>openWork(id),0); else renderWorks(); });
+  document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{ const w=WORKS.find(x=>x.id===b.dataset.mv);
+    formModal('Move “'+w.name+'” to a project folder',
+      `<div class="fld"><label for="mf">Project folder in Google Drive (link)</label><input id="mf" value="${esc(w.folderUrl||'')}" placeholder="https://drive.google.com/drive/folders/…"></div>
+       <div class="muted" style="font-size:13px">The Sheet file moves into this folder; its link and data stay the same. New photos go to “IPC Photos” in this folder.</div>`,
+      'Move', async bg=>{ const f=bg.querySelector('#mf').value.trim(); if(!isFolderLink(f)) return 'Paste the folder link from the Google Drive address bar.';
+        await moveWork(w.id,f); toast('Moved'); setTimeout(renderWorks,0); }); });
+  document.querySelectorAll('[data-rn]').forEach(b=>b.onclick=()=>{ const w=WORKS.find(x=>x.id===b.dataset.rn);
+    formModal('Rename work',`<div class="fld"><label for="wr">Work name</label><input id="wr" value="${esc(w.name)}"></div>`,'Save',
+      async bg=>{ const n=bg.querySelector('#wr').value.trim(); if(n.length<2) return 'Enter the work name.'; await renameWork(w.id,n); toast('Renamed'); setTimeout(renderWorks,0); }); });
+}
+
+/* ---------- render: shell ---------- */
+function render(){
+  if(!me()) return renderLogin();
+  if(me().role==='VIEW'){ $('#app').innerHTML=`<div class="login"><div class="lcard"><h2>Viewer account</h2><div class="muted" style="font-size:13px">${esc(me().name)} can only view. Open the <b>Check app</b> (check.html) to see contracts, payments and balances.</div><button class="btn pri" id="vOut">Sign out</button></div></div>`; $('#vOut').onclick=()=>signOut(); return; }
+  if(!UI.work || !curWork()) return renderWorks();
+  const live=!!apiUrl(), u=me();
+  $('#app').innerHTML=`
+  <header class="top"><div class="top-in">
+    <div class="brand"><img src="${LOGO}" alt="Lavish Home Build">
+      <h1>Sub-contract Payment Claims<small>${esc(PROJECT_NAME)} · តារាងស្នើសុំទូទាត់ប្រាក់ការងារសាងសង់ · IPC</small></h1></div>
+    <span class="chip ${live?'live':'demo'}" title="${live?'Connected to Google Sheets':'Data is kept in this browser only'}">${live?'Connected':'Demo mode'}</span>
+    <button class="workbtn" id="btnWork" title="Switch work"><span class="muted">Work</span><b>${esc((curWork()||{}).name||'—')}</b><span class="muted">▾ Switch</span></button>
+    <div class="spacer"></div>
+    ${isQS()?`<nav class="nav"><button class="btn sm ${UI.view==='contracts'?'on':''}" data-view="contracts">Contracts</button><button class="btn sm ${UI.view==='sum'?'on':''}" data-view="sum">Summary</button><button class="btn sm ${UI.view==='ret'?'on':''}" data-view="ret">Retention</button><button class="btn sm ${UI.view==='users'?'on':''}" data-view="users">Users</button></nav>`:''}
+    <div class="who">
+      <div class="uchip"><b>${esc(u.name)}</b><span>${ROLES[u.role].en} · ${ROLES[u.role].kh}</span></div>
+      <button class="btn sm" id="btnPw">Password</button>
+      ${isQS()?'<button class="btn sm" id="btnSettings">Settings</button>':''}
+      <button class="btn sm" id="btnOut">Sign out</button>
+    </div>
+  </div></header>
+  ${(UI.view==='users'||UI.view==='ret'||UI.view==='sum')&&isQS() ? '<div class="shell" style="grid-template-columns:minmax(0,1fr)"><main class="main" id="main"></main></div>' : `
+  <div class="shell">
+    <aside class="rail">
+      <div class="rail-h"><h2>${isQS()?'Contracts · កិច្ចសន្យា':'My houses · ផ្ទះរបស់ខ្ញុំ'}</h2>${isQS()?'<button class="btn sm" id="btnNewC">+ New</button>':''}</div>
+      <input class="search" id="q" placeholder="Search block, house no., contractor${isQS()?', engineer':''}" value="${esc(UI.q)}">
+      <div class="clist" id="clist"></div>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>`}`;
+  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{ if(UI.dirty) return toast('Save your changes first.'); UI.view=b.dataset.view; render(); });
+  $('#btnOut').onclick=()=>{ if(UI.dirty) return toast('Save your changes first.'); signOut(); };
+  $('#btnPw').onclick=openChangePassword;
+  $('#btnWork').onclick=()=>{ if(UI.dirty) return toast('Save your changes first.'); guard(showWorks); };
+  if($('#btnSettings')) $('#btnSettings').onclick=openSettings;
+  if(UI.view==='users'&&isQS()){ renderUsers($('#main')); return; }
+  if(UI.view==='ret'&&isQS()){ renderRetOverview($('#main')); return; }
+  if(UI.view==='sum'&&isQS()){ renderSummary($('#main')); return; }
+  $('#q').oninput=e=>{UI.q=e.target.value;renderList();};
+  if($('#btnNewC')) $('#btnNewC').onclick=newContract;
+  renderList(); renderMain();
+}
+function renderList(){
+  const q=UI.q.toLowerCase();
+  const list=myContracts().filter(c=>{ const h=houseFields(c); return !q||(c.location+' '+h.block+' '+h.houseNo+' '+h.houseType+' '+c.contractor+' '+c.workType+' '+userName(c.engineerId)+' '+c.projectCode).toLowerCase().includes(q); }).sort(houseSort);
+  $('#clist').innerHTML = list.length? list.map(c=>{
+    const open=claimsOf(c).find(x=>x.status!=='approved');
+    const p=approvedProgress(c);
+    return `<button class="citem ${c.id===UI.contractId?'on':''}" data-id="${c.id}">
+      ${(()=>{ const h=houseFields(c); return h.block||h.houseNo ? `<b>Block ${esc(h.block)} · #${esc(h.houseNo)}</b><div class="meta"><span>${esc(h.houseType)}</span></div>` : `<b>${esc(c.location||'(no location)')}</b>`; })()}
+      <div class="meta"><span>${esc(c.contractor)}</span><span class="num">${usd(netValue(c))}</span></div>
+      <div class="meta"><span>${isQS()?esc(userName(c.engineerId)):esc(c.projectCode)}</span>${open?`<span class="chip st-${open.status}" style="height:18px;font-size:10.5px">${pad3(open.seq)} ${STATUS[open.status].en}</span>`:retBadge(c)}</div>
+      <div class="bar" title="Approved progress ${pct(p)}"><i style="width:${Math.min(100,p*100)}%"></i></div>
+    </button>`;}).join('') : `<div class="empty">${q?'No houses match this search.':(isQS()?'No contracts yet.':'No houses are assigned to you yet. Ask QS to assign your houses.')}</div>`;
+  document.querySelectorAll('.citem').forEach(b=>b.onclick=()=>{
+    if(UI.dirty) return toast('Save or submit your changes first.');
+    UI.contractId=b.dataset.id; UI.claimId=null; UI.boqDraft=null; render();});
+}
+
+/* ---------- render: contract ---------- */
+function renderMain(){
+  const m=$('#main'); const c=curContract();
+  if(!c){
+    const mine=myContracts();
+    if(mine.length){ UI.contractId=mine[0].id; return renderMain(); }
+    m.innerHTML=`<div class="panel empty">${isQS()?'No contracts yet. Click “+ New” to set up the first sub-contract and its BOQ.':'No houses are assigned to you yet. Ask QS to assign your houses.'}</div>`; return;
+  }
+  const cls=claimsOf(c);
+  if(!UI.claimId || !cls.find(x=>x.id===UI.claimId)) UI.claimId = cls.length? cls[cls.length-1].id : null;
+  const cl=curClaim(); const v=contractValue(c), out=transferredOut(c), p=approvedProgress(c);
+  const notes=[];
+  if(c.transferFrom) notes.push(`<div class="note info">Remaining work taken over from <b>${esc(c.transferFrom.contractor)}</b> (${esc(c.transferFrom.code)}, ${esc(c.transferFrom.location)}) on ${fmtDate(c.transferFrom.at)}.${c.transferFrom.note?' '+esc(c.transferFrom.note):''}</div>`);
+  (c.transfers||[]).forEach(t=>notes.push(`<div class="note warn">${usd(t.amount)} of remaining work was transferred to <b>${esc(t.contractor)}</b> (${esc(t.code)}) on ${fmtDate(t.at)}. Those items are closed at their approved %.</div>`));
+  m.innerHTML=`
+  <section class="panel">
+    <div class="head">
+      <div style="min-width:0">
+        <div class="muted" style="font-size:12px;letter-spacing:.06em;text-transform:uppercase">${esc(c.project)} · ${esc(c.projectCode)}</div>
+        <h2>${(()=>{ const h=houseFields(c); return h.block||h.houseNo?`Block ${esc(h.block)} · House #${esc(h.houseNo)}`:esc(c.location); })()}</h2>
+        <div class="sub" style="font-weight:600">${esc(houseFields(c).houseType)}</div>
+        <div class="sub">${esc(c.workType)}</div>
+        <dl class="facts">
+          <div><dt>Contractor · អ្នកម៉ៅការ</dt><dd>${esc(c.contractor)}</dd></div>
+          <div><dt>Site engineer</dt><dd>${esc(userName(c.engineerId))}</dd></div>
+          <div><dt>Payment term</dt><dd>${esc(c.terms)}</dd></div>
+          <div><dt>Retention</dt><dd class="num">${((+c.retention||0)*100).toFixed(0)}%</dd></div>
+          <div><dt>Approved progress</dt><dd class="num">${pct(p)}</dd></div>
+        </dl>
+      </div>
+      <div class="big"><div class="l">Contract value</div><div class="v">${usd(v)}</div>
+        ${out?`<div class="muted num" style="font-size:12px">Transferred out −${money(out)} · net ${money(v-out)}</div>`:''}
+        <div class="bar" style="width:180px;margin-left:auto"><i style="width:${Math.min(100,p*100)}%"></i></div></div>
+    </div>
+    ${notes.join('')}
+    <nav class="tabs" role="tablist" style="margin-top:${notes.length?'12px':'0'}">
+      ${[['ipc','IPC Breakdown','តារាងស្នើ'],['photo','Photos','រូបភាព'],['hist','Payment History','ប្រវត្តិ'],['ret','Retention','ប្រាក់រក្សាទុក'],['boq','Contract & BOQ','កិច្ចសន្យា']].map(([k,en,kh])=>
+        `<button class="tab ${UI.tab===k?'on':''}" data-tab="${k}" role="tab" aria-selected="${UI.tab===k}">${en} <span class="muted" style="font-weight:500">${kh}</span></button>`).join('')}
+    </nav>
+    ${UI.tab==='ipc'||UI.tab==='photo' ? claimBar(c,cls,cl) : ''}
+    <div id="tabbody"></div>
+  </section>`;
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ UI.tab=b.dataset.tab; LS.set('lhb-ipc-tab',UI.tab); renderMain();});
+  document.querySelectorAll('.ipc').forEach(b=>b.onclick=()=>{ if(UI.dirty) return toast('Save or submit your changes first.'); UI.claimId=b.dataset.id; renderMain();});
+  const nb=$('#btnNewClaim'); if(nb) nb.onclick=()=>newClaim(c);
+  const pb=$('#btnPrint'); if(pb) pb.onclick=()=>doPrint(c,cl);
+  const tb=$('#tabbody');
+  if(UI.tab==='ipc') renderIPC(tb,c,cl);
+  else if(UI.tab==='photo') renderPhotos(tb,c,cl);
+  else if(UI.tab==='hist') renderHistory(tb,c);
+  else if(UI.tab==='ret') renderRetention(tb,c);
+  else renderBoq(tb,c);
+}
+function claimBar(c,cls,cl){
+  return `<div class="claimbar">
+    <span class="muted" style="font-size:12px;margin-right:4px">Claims</span>
+    ${cls.map(x=>`<button class="ipc ${x.id===UI.claimId?'on':''}" data-id="${x.id}" title="${STATUS[x.status].en}"><span class="dot ${x.status}"></span>${pad3(x.seq)}</button>`).join('')}
+    ${can.newClaim(c)?'<button class="btn sm pri" id="btnNewClaim">+ New claim</button>':''}
+    <span class="spacer"></span>
+    ${cl?`<span class="chip st-${cl.status}">${STATUS[cl.status].en} · ${STATUS[cl.status].kh}</span>`:''}
+    ${cl&&!isFramed?'<button class="btn sm" id="btnPrint">Print / PDF</button>':''}
+  </div>`;
+}
+
+/* ---------- IPC breakdown tab ---------- */
+function renderIPC(tb,c,cl){
+  if(!cl){ tb.innerHTML=`<div class="empty">No claims yet for this house. ${owns(c)?'Click “+ New claim” to start IPC 001.':'The assigned site engineer starts each claim.'}</div>`; return; }
+  const k=calc(c,cl), ed=can.editCurrent(cl,c);
+  const lastReturn=[...(cl.log||[])].reverse().find(l=>l.action==='returned');
+  let n=0; const notes=[];
+  if(cl.imported) notes.push(`<div class="note info">Imported from Excel: this shows all progress up to ${esc(cl.ipcNo)} as one approved claim. It counts as “Previous” for the next claim.</div>`);
+  if(cl.sample) notes.push(`<div class="note warn">Sample claim with example percentages. It shows how the sheet works and is not real progress.</div>`);
+  if(cl.status==='draft'&&lastReturn) notes.push(`<div class="note bad"><b>Returned by ${esc(lastReturn.by)}:</b> ${esc(lastReturn.note||'No reason given')}</div>`);
+  if(ed) notes.push(`<div class="note info">Enter <b>this claim's % only</b> in the green column. Previous comes from approved claims; Cumulative = Previous + Current and cannot exceed 100%.</div>`);
+  if(cl.status==='submitted'&&!isQS()) notes.push(`<div class="note info">Submitted. Waiting for QS to approve.</div>`);
+  if(cl.status==='draft'&&isQS()) notes.push(`<div class="note info">Draft. ${esc(userName(c.engineerId))} is still filling this in.</div>`);
+  tb.innerHTML=`
+  ${notes.join('')}
+  <div class="toolbar">
+    <div class="fld" style="max-width:200px"><label for="ipcNo">IPC No. · លេខ IPC</label><input id="ipcNo" value="${esc(cl.ipcNo)}" disabled></div>
+    <div class="fld" style="max-width:170px"><label for="ipcDate">Date · កាលបរិច្ឆេទ</label><input id="ipcDate" type="date" value="${esc(cl.date)}" ${ed?'':'disabled'}></div>
+    <div class="fld" style="max-width:220px"><label for="prepBy">Prepared by (Site Engineer)</label><input id="prepBy" value="${esc(cl.preparedBy||'')}" disabled></div>
+    <div class="fld" style="max-width:240px"><label for="smName">Checked by (Site Manager)</label><input id="smName" value="${esc(cl.siteManager||'')}" placeholder="Site Manager name" ${ed?'':'disabled'}></div>
+    <div class="grow"></div>
+    ${actionButtons(cl,c)}
+  </div>
+  <div class="tw"><table class="ipc-t">
+    <thead>
+      <tr>
+        <th rowspan="2" class="stick" style="min-width:250px;text-align:left">ITEM · DESCRIPTION<small>លរ · បរិយាយ</small></th>
+        <th rowspan="2">UNIT<small>ឯកតា</small></th>
+        <th colspan="3">CONTRACT<small>កិច្ចសន្យា</small></th>
+        <th colspan="2" class="g-prev">PREVIOUS<small>ទូទាត់លើកមុន</small></th>
+        <th colspan="2" class="g-curr">CURRENT<small>ទូទាត់លើកនេះ</small></th>
+        <th colspan="2" class="g-cum">CUMULATIVE<small>សរុបទូទាត់</small></th>
+        <th rowspan="2">REMARK<small>ផ្សេងៗ</small></th>
+      </tr>
+      <tr><th>QTY</th><th>RATE (USD)</th><th>AMOUNT (USD)</th>
+        <th class="g-prev">AMOUNT</th><th class="g-prev">%</th>
+        <th class="g-curr">AMOUNT</th><th class="g-curr">%</th>
+        <th class="g-cum">AMOUNT</th><th class="g-cum">%</th></tr>
+    </thead>
+    <tbody>
+    ${k.sections.map(S=>{ n=0; return `
+      <tr class="sec"><td class="stick">${esc(S.sec.no)} &nbsp; ${esc(S.sec.title)}</td><td></td><td></td><td></td>
+        <td class="r num">${money(S.amt)}</td><td class="r num">${money(S.prev)}</td><td></td>
+        <td class="r num" data-f="sc-${S.sec.id}">${money(S.curr)}</td><td></td><td class="r num" data-f="su-${S.sec.id}">${money(S.cum)}</td><td></td><td></td></tr>
+      ${S.rows.map(R=>{ n++; const closed=R.it.cap!=null && R.room<EPS; const done=!closed && R.room<EPS; return `
+      <tr>
+        <td class="stick"><span class="num muted" style="display:inline-block;width:22px">${n}</span>${esc(R.it.desc)}</td>
+        <td class="c">${esc(R.it.unit)}</td>
+        <td class="r num">${(+R.it.qty).toLocaleString('en-US',{maximumFractionDigits:4})}</td>
+        <td class="r num">${money(R.it.rate)}</td>
+        <td class="r num">${money(R.amt)}</td>
+        <td class="r num prev">${money(R.prev)}</td><td class="r num prev">${pct(R.pp)}</td>
+        <td class="r num curr" data-f="ca-${R.it.id}">${money(R.curr)}</td>
+        <td class="r curr">${ ed && R.room>EPS && R.amt>0 ? `<label class="pin" id="pin-${R.it.id}"><input inputmode="decimal" data-item="${R.it.id}" data-room="${R.room}" value="${R.cp? +(R.cp*100).toFixed(2):''}" placeholder="0" aria-label="Current % for ${esc(R.it.desc)}"><span>%</span></label><span class="max">max ${(R.room*100).toFixed(2)}%</span>`
+              : closed ? `<span class="tr" title="Remaining work transferred to ${esc(R.it.transferTo||'')}">TRANSFERRED</span>`
+              : done ? `<span class="full">100% DONE</span>` : `<span class="num">${pct(R.cp)}</span>`}</td>
+        <td class="r num cum" data-f="cu-${R.it.id}">${money(R.cum)}</td>
+        <td class="r num cum" data-f="cp-${R.it.id}">${pct(R.cumP)}</td>
+        <td>${R.it.transferTo?`<span class="muted" style="font-size:12px">→ ${esc(R.it.transferTo)}</span> `:''}${ed?`<input class="rmk" data-rmk="${R.it.id}" value="${esc(cl.remarks[R.it.id]||'')}" aria-label="Remark">`:esc(cl.remarks[R.it.id]||'')}</td>
+      </tr>`;}).join('')}`;}).join('')}
+    </tbody>
+    <tfoot>
+      ${totRow('[ I ] TOTAL INTERIM PAYMENT CLAIM · សរុបទឹកប្រាក់ស្នើសុំទូទាត់','t',k.tot,true)}
+      ${totRow(`[ II ] RETENTION ${((+c.retention||0)*100).toFixed(0)}% · ទឹកប្រាក់រក្សាទុក`,'r',k.tot.ret)}
+      ${totRow('[ III ] RECEIVED AMOUNT ( I − II ) · ទឹកប្រាក់ត្រូវទទួលបាន','n',k.tot.net)}
+    </tfoot>
+  </table></div>
+  <div class="sum">
+    <div><div class="l">Contract${transferredOut(c)?' (net)':''}</div><div class="v">${usd(netValue(c))}</div></div>
+    <div><div class="l">Previous claims</div><div class="v">${usd(k.tot.prev)}</div></div>
+    <div><div class="l">This claim (net of retention)</div><div class="v curr" data-f="s-net">${usd(k.tot.net.curr)}</div></div>
+    <div><div class="l">Cumulative %</div><div class="v" data-f="s-cum">${pct(netValue(c)?k.tot.cum/netValue(c):0)}</div></div>
+  </div>
+  ${logList(cl)}`;
+  bindIPC(c,cl);
+}
+function totRow(label,key,o,grand){
+  const p=o.amt? (x=>x/o.amt):(()=>0);
+  return `<tr class="${grand?'grand':''}"><td class="stick">${label}</td><td></td><td></td><td></td>
+    <td class="r num">${money(o.amt)}</td>
+    <td class="r num">${money(o.prev)}</td><td class="r num">${pct(p(o.prev))}</td>
+    <td class="r num" data-f="${key}-curr">${money(o.curr)}</td><td class="r num" data-f="${key}-currp">${pct(p(o.curr))}</td>
+    <td class="r num" data-f="${key}-cum">${money(o.cum)}</td><td class="r num" data-f="${key}-cump">${pct(p(o.cum))}</td><td></td></tr>`;
+}
+function actionButtons(cl,c){
+  const b=[];
+  if(can.editCurrent(cl,c)){
+    b.push(`<button class="btn" id="btnSave">Save draft</button>`);
+    b.push(`<button class="btn go" id="btnSubmit">Submit for approval</button>`);
+    b.push(`<button class="btn danger sm" id="btnDel">${UI.delArm===cl.id?'Click again to delete':'Delete draft'}</button>`);
+  }
+  if(can.review(cl)){
+    b.push(`<button class="btn danger" id="btnReturn">Return to engineer</button>`);
+    b.push(`<button class="btn go" id="btnApprove">Approve</button>`);
+  }
+  return b.join('');
+}
+function logList(cl){
+  if(!cl.log||!cl.log.length) return '';
+  const verbs={submitted:'Submitted',approved:'Approved',returned:'Returned',created:'Created',handover:'Handed over',imported:'Imported'};
+  return `<ul class="log">${cl.log.map(l=>`<li>${new Date(l.at).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'})} — ${verbs[l.action]||esc(l.action)} by ${esc(l.by||'?')}${l.note?': '+esc(l.note):''}</li>`).join('')}</ul>`;
+}
+function setF(key,val){ const el=document.querySelector(`[data-f="${key}"]`); if(el) el.textContent=val; }
+function refreshFigures(c,cl){
+  const k=calc(c,cl);
+  k.sections.forEach(S=>{
+    setF('sc-'+S.sec.id,money(S.curr)); setF('su-'+S.sec.id,money(S.cum));
+    S.rows.forEach(R=>{ setF('ca-'+R.it.id,money(R.curr)); setF('cu-'+R.it.id,money(R.cum)); setF('cp-'+R.it.id,pct(R.cumP)); });
+  });
+  const T=k.tot, p=x=>T.amt?x/T.amt:0;
+  [['t',T],['r',T.ret],['n',T.net]].forEach(([key,o])=>{
+    setF(key+'-curr',money(o.curr)); setF(key+'-currp',pct(p(o.curr))); setF(key+'-cum',money(o.cum)); setF(key+'-cump',pct(p(o.cum)));
+  });
+  const nv=netValue(c); setF('s-net',usd(T.net.curr)); setF('s-cum',pct(nv?T.cum/nv:0));
+}
+function invalidLines(c,cl){
+  return allItems(c).filter(it=>{ const cp=+cl.lines[it.id]||0; return cp<0 || prevPct(c,cl,it.id)+cp>capOf(it)+EPS; });
+}
+function addLog(cl,action,note){ (cl.log=cl.log||[]).push({at:new Date().toISOString(),by:me().name,role:me().role,action,note:note||''}); }
+function bindIPC(c,cl){
+  document.querySelectorAll('.pin input').forEach(inp=>{
+    inp.oninput=()=>{
+      const raw=inp.value.replace(',','.').trim(); const room=+inp.dataset.room;
+      const v = raw===''?0:Number(raw)/100;
+      const lab=inp.closest('.pin'); const bad = isNaN(v) || v<0 || v>room+EPS;
+      lab.classList.toggle('bad',bad); lab.title = bad ? `Must be between 0% and ${(room*100).toFixed(2)}%` : '';
+      if(!isNaN(v)){ if(v) cl.lines[inp.dataset.item]=r6(v); else delete cl.lines[inp.dataset.item]; }
+      UI.dirty=true; refreshFigures(c,cl);
+    };
+    inp.onkeydown=e=>{ if(e.key==='Enter'||e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault();
+      const all=[...document.querySelectorAll('.pin input')]; const i=all.indexOf(inp)+(e.key==='ArrowUp'?-1:1);
+      if(all[i]){ all[i].focus(); all[i].select(); } } };
+  });
+  document.querySelectorAll('[data-rmk]').forEach(inp=>inp.oninput=()=>{ const v=inp.value.trim(); if(v) cl.remarks[inp.dataset.rmk]=v; else delete cl.remarks[inp.dataset.rmk]; UI.dirty=true; });
+  const d=$('#ipcDate'); if(d&&!d.disabled) d.onchange=()=>{cl.date=d.value;UI.dirty=true;};
+  const sm=$('#smName'); if(sm&&!sm.disabled) sm.oninput=()=>{cl.siteManager=sm.value.trim();UI.dirty=true;};
+  const on=(id,fn)=>{const b=$('#'+id); if(b) b.onclick=fn;};
+  on('btnSave',()=>UI.uploading?toast('Wait until the photos finish uploading.'):guard(async()=>{ cl.preparedBy=me().name; await persistClaim(cl); UI.dirty=false; toast('Draft saved'); renderList(); }));
+  on('btnSubmit',async()=>{
+    if(!(cl.siteManager||'').trim()){ toast('Enter the Site Manager name in “Checked by”.'); $('#smName').focus(); return; }
+    const bad=invalidLines(c,cl);
+    if(bad.length){ toast(`Fix ${bad.length} item(s): cumulative is over the allowed %.`); return; }
+    if(!Object.values(cl.lines).some(v=>v>0)){ toast('Enter at least one current % before submitting.'); return; }
+    if(UI.uploading){ toast('Wait until the photos finish uploading.'); return; }
+    if(!(cl.photos||[]).length){ toast('Add at least one progress photo in the Photos tab.'); UI.tab='photo'; renderMain(); return; }
+    await guard(async()=>{ cl.status='submitted'; cl.preparedBy=me().name; cl.sample=false; addLog(cl,'submitted'); await persistClaim(cl); UI.dirty=false; toast('Submitted for approval'); render(); });
+  });
+  on('btnDel',async()=>{
+    if(UI.delArm!==cl.id){ UI.delArm=cl.id; renderMain(); setTimeout(()=>{ if(UI.delArm===cl.id){UI.delArm=null; if(UI.tab==='ipc') renderMain();} },4000); return; }
+    UI.delArm=null; await guard(async()=>{ await removeClaim(cl); UI.claimId=null; UI.dirty=false; toast('Draft deleted'); render(); });
+  });
+  on('btnApprove',()=>guard(async()=>{ cl.status='approved'; cl.approvedBy=me().name; addLog(cl,'approved'); await persistClaim(cl); toast(`${cl.ipcNo} approved`); render(); }));
+  on('btnReturn',()=>formModal('Return claim to site engineer',
+    `<div class="fld"><label for="rn">What needs to change?</label><textarea id="rn" rows="3"></textarea></div>`,'Return claim',
+    async bg=>{ const note=bg.querySelector('#rn').value.trim(); if(!note) return 'Write the reason so the engineer knows what to fix.';
+      cl.status='draft'; addLog(cl,'returned',note); await persistClaim(cl); toast('Returned to engineer'); render(); }));
+}
+async function newClaim(c){
+  const cls=claimsOf(c); const seq=Math.max((cls.length?Math.max(...cls.map(x=>x.seq)):0)+1, c.nextSeq||1);
+  const cl={id:uid('cl'),contractId:c.id,seq,ipcNo:`IPC_${c.projectCode}-${pad3(seq)}`,date:today(),status:'draft',lines:{},remarks:{},photos:[],
+    preparedBy:me().name,siteManager:cls.length?(cls[cls.length-1].siteManager||''):'',log:[]};
+  addLog(cl,'created');
+  await guard(async()=>{ await persistClaim(cl); UI.claimId=cl.id; UI.tab='ipc'; render(); toast(`${cl.ipcNo} created`); });
+}
+
+/* ---------- Photos tab ---------- */
+function renderPhotos(tb,c,cl){
+  if(!cl){ tb.innerHTML='<div class="empty">Start a claim first. Photos belong to a claim.</div>'; return; }
+  const ed=can.editCurrent(cl,c); const ph=cl.photos||[];
+  tb.innerHTML=`
+    <div class="note info">${cl.type==='RET'?`Photos for <b>${esc(cl.ipcNo)}</b>: the house condition at the defect inspection.`:`Photos for <b>${esc(cl.ipcNo)}</b> only: this period's progress.`} Write what each photo shows below it.</div>
+    <div class="pgrid">
+      ${ph.map((p,i)=>`<figure class="ph" style="margin:0">
+        <div class="img ${p.pending?'pending':''}" data-ph="${p.id}"><span class="n">${i+1}</span><img src="${esc(p.src)}" alt="${esc(p.caption||'Progress photo '+(i+1))}" loading="lazy">${p.pending?'<span class="upl">Uploading…</span>':''}</div>
+        ${ed?`<textarea data-cap="${p.id}" placeholder="Description · បរិយាយ (e.g. ការ៉ូបាតផ្ទះ ជាន់ផ្ទាល់ដី 50%)" aria-label="Description for photo ${i+1}">${esc(p.caption||'')}</textarea>
+          <div class="act"><button class="x" data-up="${p.id}" title="Move earlier" aria-label="Move earlier">◀</button><button class="x" data-dn="${p.id}" title="Move later" aria-label="Move later">▶</button><button class="x" data-rm="${p.id}">Remove</button></div>`
+          :`<figcaption class="cap">${esc(p.caption||'—')}</figcaption>`}
+      </figure>`).join('')}
+      ${ed && ph.length<CONFIG.MAX_PHOTOS?`<label class="drop" id="drop" for="file"><b>+</b><span>Add photos<br><span style="font-size:12px">Click or drop images · ${ph.length}/${CONFIG.MAX_PHOTOS}</span></span></label><input id="file" type="file" accept="image/*" multiple hidden>`:''}
+    </div>
+    ${!ph.length&&!ed?'<div class="empty">No photos in this claim.</div>':''}
+    ${ed?`<div class="toolbar"><div class="grow"></div><button class="btn" id="btnSaveP">Save photos</button></div>`:''}`;
+  if(!ed) return;
+  const add=async files=>{
+    const room=CONFIG.MAX_PHOTOS-(cl.photos||[]).length;
+    const list=[...files].filter(f=>f.type.startsWith('image/')).slice(0,room);
+    if(!list.length) return;
+    // 1) show every photo at once from the phone/PC file, so captions can be typed straight away
+    const jobs=list.map(f=>{ const p={id:uid('ph'),src:URL.createObjectURL(f),caption:'',pending:true}; (cl.photos=cl.photos||[]).push(p); return {f,p}; });
+    UI.uploading=(UI.uploading||0)+jobs.length; UI.dirty=true;
+    renderPhotos(tb,c,cl);
+    // 2) shrink + upload several at a time in the background
+    let failed=0;
+    const one=async ({f,p})=>{
+      try{
+        const data=await shrink(f);
+        const url=await uploadPhoto(data,`${cl.ipcNo}_${Date.now()}_${Math.random().toString(36).slice(2,6)}.jpg`);
+        URL.revokeObjectURL(p.src); p.src=url; delete p.pending;
+        const box=document.querySelector(`[data-ph="${p.id}"]`);
+        if(box){ box.classList.remove('pending'); const u=box.querySelector('.upl'); if(u) u.remove(); box.querySelector('img').src=url; }
+      }catch(e){ failed++; cl.photos=cl.photos.filter(x=>x.id!==p.id); }
+      finally{ UI.uploading--; }
+    };
+    const queue=[...jobs];
+    await Promise.all(Array.from({length:Math.min(CONFIG.PHOTO_PARALLEL,queue.length)},async()=>{ while(queue.length) await one(queue.shift()); }));
+    // 3) one save for the whole batch (captions typed meanwhile are included)
+    if(!UI.uploading) await guard(async()=>{ await persistClaim(cl); UI.dirty=false; });   // last batch to finish saves
+    if(failed) toast(`${failed} photo(s) failed to upload. Check the connection and add them again.`);
+    else toast(`${jobs.length} photo(s) uploaded`);
+    if(tb.isConnected) renderPhotos(tb,c,cl);
+  };
+  const fi=$('#file'); if(fi) fi.onchange=()=>add(fi.files);
+  const dr=$('#drop');
+  if(dr){ dr.ondragover=e=>{e.preventDefault();dr.classList.add('over')}; dr.ondragleave=()=>dr.classList.remove('over');
+    dr.ondrop=e=>{e.preventDefault();dr.classList.remove('over');add(e.dataTransfer.files)}; }
+  tb.querySelectorAll('[data-cap]').forEach(t=>t.oninput=()=>{const p=cl.photos.find(x=>x.id===t.dataset.cap); p.caption=t.value; UI.dirty=true;});
+  tb.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{cl.photos=cl.photos.filter(x=>x.id!==b.dataset.rm); UI.dirty=true; renderPhotos(tb,c,cl);});
+  const mv=(id,d)=>{const i=cl.photos.findIndex(x=>x.id===id),j=i+d; if(j<0||j>=cl.photos.length)return; [cl.photos[i],cl.photos[j]]=[cl.photos[j],cl.photos[i]]; UI.dirty=true; renderPhotos(tb,c,cl);};
+  tb.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>mv(b.dataset.up,-1));
+  tb.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>mv(b.dataset.dn,1));
+  $('#btnSaveP').onclick=()=>{ if(UI.uploading) return toast('Wait until the photos finish uploading.'); guard(async()=>{await persistClaim(cl);UI.dirty=false;toast('Photos saved');}); };
+}
+async function shrink(file){
+  // createImageBitmap decodes faster and uses less memory than FileReader + <img> (falls back on old browsers)
+  let src;
+  try{ src=await createImageBitmap(file,{imageOrientation:'from-image'}); }
+  catch(e){
+    src=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('Unsupported image')); im.src=URL.createObjectURL(file); });
+  }
+  const w=src.width,h=src.height, s=Math.min(1,CONFIG.PHOTO_MAX_PX/Math.max(w,h));
+  const cv=document.createElement('canvas'); cv.width=Math.round(w*s); cv.height=Math.round(h*s);
+  cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);
+  if(src.close) src.close();
+  return cv.toDataURL('image/jpeg',CONFIG.PHOTO_QUALITY);
+}
+
+/* ---------- Payment history tab ---------- */
+function renderHistory(tb,c){
+  const cls=claimsOf(c), v=netValue(c);
+  if(!cls.length){ tb.innerHTML='<div class="empty">No claims yet.</div>'; return; }
+  let sumC=0,sumR=0,sumN=0;
+  const rows=cls.map(cl=>{
+    const s=summarize(c,cl); const appr=cl.status==='approved';
+    if(appr){sumC+=s.current;sumR+=s.retention;sumN+=s.received;}
+    return `<tr class="${appr?'':'draft'}"><td class="num">${esc(cl.ipcNo)}</td><td>${fmtDate(cl.date)}</td>
+      <td><span class="chip st-${cl.status}">${STATUS[cl.status].en}</span></td>
+      <td class="r num">${money(s.current)}</td><td class="r num">${pct(v?s.current/v:0)}</td>
+      <td class="r num">${money(s.retention)}</td><td class="r num">${money(s.received)}</td>
+      <td class="r num">${pct(v?s.cumulative/v:0)}</td><td class="r num">${money(s.balance)}</td><td>${esc(cl.preparedBy||'')}</td></tr>`;}).join('');
+  tb.innerHTML=`<div class="note info">Totals count approved claims only. Balance = contract value${transferredOut(c)?' (net of work transferred out)':''} − cumulative claimed.</div>
+  <div class="tw" style="margin-top:12px"><table class="ht">
+    <thead><tr><th>IPC No.<small>លេខ IPC</small></th><th>Date<small>កាលបរិច្ឆេទ</small></th><th>Status</th>
+      <th>Current claim<small>ទឹកប្រាក់ស្នើលើកនេះ</small></th><th>%</th><th>Retention ${((+c.retention||0)*100).toFixed(0)}%<small>ទឹកប្រាក់រក្សាទុក</small></th>
+      <th>Received<small>ទឹកប្រាក់ទទួលបាន</small></th><th>Cumulative %</th><th>Balance<small>ទឹកប្រាក់នៅសល់</small></th><th>Prepared by</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="3">Total approved · សរុប</td><td class="r num">${money(sumC)}</td><td class="r num">${pct(v?sumC/v:0)}</td>
+      <td class="r num">${money(sumR)}</td><td class="r num">${money(sumN)}</td><td></td><td class="r num">${money(v-sumC)}</td><td></td></tr></tfoot>
+  </table></div>
+  ${retClaimsOf(c).length?`<div class="tw" style="margin-top:14px"><table class="ht">
+    <thead><tr><th>Retention release<small>ដោះលែងប្រាក់រក្សាទុក</small></th><th>Date</th><th>Status</th><th>Requested</th><th>Deduction</th><th>Net release</th><th>Prepared by</th></tr></thead>
+    <tbody>${retClaimsOf(c).map(r=>`<tr class="${r.status==='approved'?'':'draft'}"><td class="num">${esc(r.ipcNo)}</td><td>${fmtDate(r.date)}</td><td><span class="chip st-${r.status}">${STATUS[r.status].en}</span></td>
+      <td class="r num">${money(r.amount)}</td><td class="r num">${money(r.deduction)}</td><td class="r num">${money((+r.amount||0)-(+r.deduction||0))}</td><td>${esc(r.preparedBy||'')}</td></tr>`).join('')}</tbody></table></div>`:''}`;
+}
+
+/* ---------- Contract & BOQ tab (QS) ---------- */
+function usedItems(c){ const u=new Set(); claimsOf(c).forEach(cl=>Object.keys(cl.lines).forEach(k=>{ if(cl.lines[k]>0) u.add(k); })); return u; }
+const boqDirty = c => UI.boqDraft && UI.boqDraft.id===c.id && JSON.stringify(UI.boqDraft)!==JSON.stringify(c);
+function renderBoq(tb,c){
+  const ed=can.editBoq();
+  if(ed && (!UI.boqDraft || UI.boqDraft.id!==c.id)){ UI.boqDraft=clone(c); if(!c.block&&!c.houseNo&&!c.houseType) Object.assign(UI.boqDraft,splitLoc(c.location)); }
+  const d= ed? UI.boqDraft : c; const used=usedItems(c);
+  const dis=ed?'':'disabled';
+  const hasClaims=claimsOf(c).length>0;
+  const F=(k,l,t='text',extra='')=>`<div class="fld"><label for="f-${k}">${l}</label><input id="f-${k}" data-k="${k}" type="${t}" value="${esc(k==='retention'?((+d[k]||0)*100):d[k])}" ${dis} ${extra}></div>`;
+  const engSel = ed && !hasClaims
+    ? `<div class="fld"><label for="f-eng">Site engineer · វិស្វករការដ្ឋាន</label><select id="f-eng"><option value="">— Select engineer —</option>${engineers().map(u=>`<option value="${u.id}" ${d.engineerId===u.id?'selected':''}>${esc(u.name)} (${esc(u.username)})</option>`).join('')}</select></div>`
+    : `<div class="fld"><label for="f-eng">Site engineer · វិស្វករការដ្ឋាន</label><input id="f-eng" value="${esc(userName(d.engineerId))}" disabled></div>`;
+  tb.innerHTML=`
+  ${ed?'<div class="note info">QS only. After the first claim, use “Change engineer” so the hand-over is recorded.</div>':'<div class="note info">Set by the QS team. Read only for your role.</div>'}
+  <div class="form">
+    ${F('project','Project · គម្រោង')}${F('projectCode','Contract No. (used in IPC No.)')}
+    ${F('houseType','House type · ប្រភេទផ្ទះ')}${F('block','Block · ប្លុក')}${F('houseNo','House No. · លេខផ្ទះ')}${F('contractor','Contractor · អ្នកម៉ៅការ')}
+    ${F('workType','Work type · ប្រភេទការងារ')}${F('terms','Payment term · លក្ខខណ្ឌទូទាត់')}
+    ${F('retention','Retention %','number','min="0" max="100" step="0.5"')}${engSel}
+  </div>
+  ${retSchedForm(d,ed)}
+  <div class="tw"><table class="bq">
+    <thead><tr><th style="width:56px">No.</th><th>Description · បរិយាយ</th><th style="width:90px">Unit</th><th style="width:100px;text-align:right">Qty</th><th style="width:120px;text-align:right">Rate (USD)</th><th style="width:120px;text-align:right">Amount</th><th style="width:40px"></th></tr></thead>
+    <tbody>
+    ${d.sections.map((s,si)=>`
+      <tr class="sec"><td><input data-s="${si}" data-sk="no" value="${esc(s.no)}" ${dis}></td><td colspan="4"><input data-s="${si}" data-sk="title" value="${esc(s.title)}" ${dis}></td>
+        <td class="r num">${money(s.items.reduce((a,it)=>a+itemAmt(it),0))}</td>
+        <td>${ed&&!s.items.some(it=>used.has(it.id)||it.cap!=null)?`<button class="x" data-dels="${si}" title="Delete section" aria-label="Delete section">✕</button>`:''}</td></tr>
+      ${s.items.map((it,ii)=>{ const lock=it.cap!=null; const di=(ed&&!lock)?'':'disabled'; return `<tr>
+        <td class="num muted">${ii+1}</td>
+        <td><input data-s="${si}" data-i="${ii}" data-ik="desc" value="${esc(it.desc)}" ${di}>${lock?`<span class="tr">TRANSFERRED → ${esc(it.transferTo||'')} · closed at ${pct(it.cap)}</span>`:''}</td>
+        <td><input data-s="${si}" data-i="${ii}" data-ik="unit" value="${esc(it.unit)}" ${di}></td>
+        <td><input class="n" data-s="${si}" data-i="${ii}" data-ik="qty" inputmode="decimal" value="${esc(it.qty)}" ${di}></td>
+        <td><input class="n" data-s="${si}" data-i="${ii}" data-ik="rate" inputmode="decimal" value="${esc(it.rate)}" ${di}></td>
+        <td class="r num" data-amt="${si}-${ii}">${money(itemAmt(it))}</td>
+        <td>${ed&&!lock&&!used.has(it.id)?`<button class="x" data-deli="${si}-${ii}" title="Delete item" aria-label="Delete item">✕</button>`:''}</td></tr>`;}).join('')}
+      ${ed?`<tr><td></td><td colspan="6"><button class="btn sm" data-addi="${si}">+ Item in ${esc(s.no)}</button></td></tr>`:''}`).join('')}
+    </tbody>
+    <tfoot><tr><td colspan="5" style="font-weight:700;padding:8px">Contract value · ចំនួនទឹកប្រាក់សរុបនៃកិច្ចសន្យា</td><td class="r num" id="bqTot" style="font-weight:700">${money(contractValue(d))}</td><td></td></tr></tfoot>
+  </table></div>
+  ${ed?`<div class="toolbar"><button class="btn" id="btnAddS">+ Section</button><button class="btn" id="btnDup">Duplicate for another unit</button>
+    <button class="btn" id="btnChEng">Change engineer</button><button class="btn" id="btnXfer">Transfer to another contractor</button><div class="grow"></div>
+    <button class="btn" id="btnCancelB">Discard changes</button><button class="btn pri" id="btnSaveB">Save contract</button></div>`:''}
+  ${historyList(c)}`;
+  if(!ed) return;
+  tb.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{ d[i.dataset.k]= i.dataset.k==='retention' ? (+i.value||0)/100 : i.value; });
+  bindRetSched(tb,d);
+  const es=$('#f-eng'); if(es && es.tagName==='SELECT') es.onchange=()=>{ d.engineerId=es.value||null; };
+  tb.querySelectorAll('[data-sk]').forEach(i=>i.oninput=()=>{ d.sections[i.dataset.s][i.dataset.sk]=i.value; });
+  tb.querySelectorAll('[data-ik]').forEach(i=>i.oninput=()=>{
+    const it=d.sections[i.dataset.s].items[i.dataset.i]; const k=i.dataset.ik;
+    it[k]= (k==='qty'||k==='rate') ? (i.value===''?0:Number(i.value.replace(',','.'))||0) : i.value;
+    const a=tb.querySelector(`[data-amt="${i.dataset.s}-${i.dataset.i}"]`); if(a) a.textContent=money(itemAmt(it));
+    $('#bqTot').textContent=money(contractValue(d));
+  });
+  tb.querySelectorAll('[data-addi]').forEach(b=>b.onclick=()=>{ d.sections[b.dataset.addi].items.push({id:uid('it'),desc:'',unit:'set',qty:1,rate:0}); renderBoq(tb,c); });
+  tb.querySelectorAll('[data-deli]').forEach(b=>b.onclick=()=>{ const [s,i]=b.dataset.deli.split('-'); d.sections[s].items.splice(i,1); renderBoq(tb,c); });
+  tb.querySelectorAll('[data-dels]').forEach(b=>b.onclick=()=>{ d.sections.splice(b.dataset.dels,1); renderBoq(tb,c); });
+  $('#btnAddS').onclick=()=>{ const roman=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV']; d.sections.push({id:uid('s'),no:roman[d.sections.length]||String(d.sections.length+1),title:'',items:[{id:uid('it'),desc:'',unit:'set',qty:1,rate:0}]}); renderBoq(tb,c); };
+  $('#btnCancelB').onclick=()=>{ UI.boqDraft=null; renderBoq(tb,c); toast('Changes discarded'); };
+  $('#btnSaveB').onclick=()=>guard(async()=>{
+    if(!d.engineerId) return toast('Select the site engineer for this house.');
+    if(!String(d.projectCode||'').trim()) return toast('Enter the Contract No.');
+    ['houseType','block','houseNo'].forEach(k=>d[k]=String(d[k]||'').trim());
+    if(!d.block||!d.houseNo) return toast('Enter the Block and House No.');
+    d.location=composeLoc(d);
+    const se=retSchedError(d); if(se) return toast(se);
+    await persistContract(clone(d)); UI.boqDraft=null; toast('Contract saved'); render(); });
+  $('#btnDup').onclick=()=>{ if(boqDirty(c)) return toast('Save or discard contract changes first.'); openDuplicate(c); };
+  $('#btnChEng').onclick=()=>{ if(boqDirty(c)) return toast('Save or discard contract changes first.'); openChangeEngineer(c); };
+  $('#btnXfer').onclick=()=>{ if(boqDirty(c)) return toast('Save or discard contract changes first.'); openTransferContractor(c); };
+}
+/* retention release schedule (contract) */
+function retSchedForm(d,ed){
+  const s=retSchedule(d), two=s.length>1, dis=ed?'':'disabled';
+  const v=(i,k)=>s[i]?(k==='pct'?+(s[i].pct*100).toFixed(2):s[i].months):(k==='pct'?50:12);
+  return `<div class="rsched">
+    <div class="rs-h"><b>Retention release · ការដោះលែងប្រាក់រក្សាទុក</b><span class="muted">Months are counted from the date the work is 100% approved (start of DLP).</span></div>
+    <div class="rs-row"><span class="rs-l">Stage 1</span><input id="rs1p" class="num" inputmode="decimal" value="${v(0,'pct')}" ${dis}><span>% of retention after</span><input id="rs1m" class="num" inputmode="numeric" value="${v(0,'months')}" ${dis}><span>months</span></div>
+    <div class="rs-row"><label class="rs-l"><input type="checkbox" id="rs2on" ${two?'checked':''} ${dis}> Stage 2</label><input id="rs2p" class="num" inputmode="decimal" value="${two?v(1,'pct'):50}" ${dis||(two?'':'disabled')}><span>% of retention after</span><input id="rs2m" class="num" inputmode="numeric" value="${two?v(1,'months'):12}" ${dis||(two?'':'disabled')}><span>months</span></div>
+  </div>`;
+}
+function bindRetSched(tb,d){
+  const g=id=>tb.querySelector('#'+id); if(!g('rs1p')) return;
+  const read=()=>{ const st=[{pct:(Number(g('rs1p').value.replace(',','.'))||0)/100,months:parseInt(g('rs1m').value,10)||0}];
+    if(g('rs2on').checked) st.push({pct:(Number(g('rs2p').value.replace(',','.'))||0)/100,months:parseInt(g('rs2m').value,10)||0});
+    d.retSchedule=st; };
+  ['rs1p','rs1m','rs2p','rs2m'].forEach(id=>g(id).oninput=read);
+  g('rs2on').onchange=()=>{ const on=g('rs2on').checked; g('rs2p').disabled=g('rs2m').disabled=!on;
+    if(on && Math.abs((Number(g('rs1p').value)||0)-100)<0.01){ g('rs1p').value=50; g('rs2p').value=50; }
+    if(!on){ g('rs1p').value=100; } read(); };
+}
+function retSchedError(d){
+  const s=retSchedule(d), sum=s.reduce((a,x)=>a+(+x.pct||0),0);
+  if(s.some(x=>!(x.pct>0))) return 'Each retention stage needs a % above 0.';
+  if(Math.abs(sum-1)>0.0001) return `Retention stages must add up to 100% (now ${(sum*100).toFixed(2)}%).`;
+  if(s.some(x=>!(x.months>=0))) return 'Enter the months for each retention stage.';
+  if(s.length>1 && s[1].months<=s[0].months) return 'Stage 2 must be later than stage 1.';
+  return '';
+}
+function historyList(c){
+  const eng=(c.engineerLog||[]), tr=(c.transfers||[]);
+  if(!eng.length&&!tr.length&&!c.transferFrom) return '';
+  return `<div class="hist">
+    ${eng.length?`<h4>Engineer history</h4><ul>${eng.map(l=>`<li>${fmtDate(l.at)} — ${l.from?esc(userName(l.from))+' → ':''}${esc(userName(l.to))} (by ${esc(l.by)})${l.note?': '+esc(l.note):''}</li>`).join('')}</ul>`:''}
+    ${tr.length?`<h4>Transferred to other contractors</h4><ul>${tr.map(t=>`<li>${fmtDate(t.at)} — ${esc(t.contractor)} (${esc(t.code)}), ${t.items} item(s), ${usd(t.amount)} (by ${esc(t.by)})${t.note?': '+esc(t.note):''}</li>`).join('')}</ul>`:''}
+  </div>`;
+}
+async function newContract(){
+  const c={id:uid('ct'),project:'The Anajak',projectCode:'',contractor:'',location:'New contract',houseType:'',block:'',houseNo:'',workType:'',terms:'ពីរសប្តាហ៍',retention:0.10,retSchedule:[{pct:1,months:12}],engineerId:null,transfers:[],engineerLog:[],
+    sections:[{id:uid('s'),no:'I',title:'',items:[{id:uid('it'),desc:'',unit:'set',qty:1,rate:0}]}]};
+  upsertLocal('contracts',c); UI.contractId=c.id; UI.tab='boq'; UI.boqDraft=null; render();
+  toast('Fill in the contract, choose the engineer, then Save contract.');
+}
+function openDuplicate(c){
+  const h=houseFields(c);
+  formModal('Duplicate contract for another house',`<div class="mgrid">
+      <div class="fld"><label for="dt">House type</label><input id="dt" value="${esc(h.houseType)}"></div>
+      <div class="fld"><label for="db">Block</label><input id="db" value="${esc(h.block)}"></div>
+      <div class="fld"><label for="dn">House No.</label><input id="dn" placeholder="e.g. 07"></div>
+      <div class="fld"><label for="dc">Contract No.</label><input id="dc" placeholder="e.g. HE2026008"></div>
+      <div class="fld"><label for="de">Site engineer</label><select id="de">${engineers().map(u=>`<option value="${u.id}" ${u.id===c.engineerId?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div>`,
+    'Create copy', async bg=>{
+      const hh={houseType:bg.querySelector('#dt').value.trim(),block:bg.querySelector('#db').value.trim(),houseNo:bg.querySelector('#dn').value.trim()};
+      const code=bg.querySelector('#dc').value.trim(), eng=bg.querySelector('#de').value;
+      if(!hh.block||!hh.houseNo||!code) return 'Enter the Block, House No. and Contract No.';
+      const nc=clone(c); Object.assign(nc,hh,{id:uid('ct'),location:composeLoc(hh),projectCode:code,engineerId:eng,transfers:[],engineerLog:[{at:today(),from:null,to:eng,by:me().name,note:'Assigned'}]});
+      delete nc.transferFrom; delete nc.sample;
+      nc.sections.forEach(s=>{s.id=uid('s'); s.items.forEach(it=>{it.id=uid('it'); delete it.cap; delete it.transferTo;});});
+      nc.sections.forEach(s=>s.items=s.items.filter(it=>itemAmt(it)>=0));
+      await persistContract(nc); UI.contractId=nc.id; UI.boqDraft=null; toast('Contract copied'); render();
+    });
+}
+
+/* ---------- transfers ---------- */
+function openChangeEngineer(c){
+  const cls=claimsOf(c);
+  if(cls.some(x=>x.status==='submitted')) return toast('Approve or return the submitted claim first.');
+  const opts=engineers().filter(u=>u.id!==c.engineerId);
+  if(!opts.length) return toast('Add another site engineer in Users first.');
+  const draft=cls.find(x=>x.status==='draft');
+  formModal(`Change engineer · ${c.location}`,`
+    <div class="muted" style="font-size:13px">Current engineer: <b>${esc(userName(c.engineerId))}</b>. The new engineer takes over all remaining work and future claims. Past claims keep their original “Prepared by”.${draft?` The open draft ${esc(draft.ipcNo)} moves to the new engineer.`:''}</div>
+    <div class="mgrid">
+      <div class="fld"><label for="ne">New site engineer</label><select id="ne">${opts.map(u=>`<option value="${u.id}">${esc(u.name)} (${esc(u.username)})</option>`).join('')}</select></div>
+      <div class="fld"><label for="nd">Effective date</label><input id="nd" type="date" value="${today()}"></div>
+    </div>
+    <div class="fld"><label for="nn">Reason / note</label><textarea id="nn" rows="2" placeholder="e.g. Engineer moved to Hanuman Estate"></textarea></div>`,
+  'Change engineer', async bg=>{
+    const to=bg.querySelector('#ne').value, at=bg.querySelector('#nd').value||today(), note=bg.querySelector('#nn').value.trim();
+    const nc=clone(c); const from=nc.engineerId; nc.engineerId=to;
+    (nc.engineerLog=nc.engineerLog||[]).push({at,from,to,by:me().name,note});
+    const claims=[];
+    if(draft){ const dc=clone(draft); dc.preparedBy=userName(to); addLog(dc,'handover',`${userName(from)} → ${userName(to)}`); claims.push(dc); }
+    await persistBatch([nc],claims); UI.boqDraft=null; toast(`Handed over to ${userName(to)}`); render();
+  });
+}
+function openTransferContractor(c){
+  if(claimsOf(c).some(x=>x.status!=='approved')) return toast('Approve, return or delete the open claim first. Only approved work stays with the current contractor.');
+  const rows=[]; c.sections.forEach(s=>s.items.forEach(it=>{
+    const ap=approvedPct(c,it.id), rem=capOf(it)-ap;
+    if(itemAmt(it)>0 && rem>EPS) rows.push({s,it,ap,rem,amt:r2(itemAmt(it)*rem)});
+  }));
+  if(!rows.length) return toast('No remaining work to transfer.');
+  let lastSec=null;
+  const bg=formModal(`Transfer remaining work to another contractor`,`
+    <div class="muted" style="font-size:13px">From <b>${esc(c.contractor)}</b> · ${esc(c.location)}. Approved work stays with ${esc(c.contractor)}. The selected remaining work becomes a new contract at the same rates; the transferred items are closed on this contract.</div>
+    <div class="mgrid">
+      <div class="fld"><label for="tc">New contractor · អ្នកម៉ៅការថ្មី</label><input id="tc"></div>
+      <div class="fld"><label for="tn">New Contract No.</label><input id="tn" placeholder="e.g. ${esc(c.projectCode)}-B"></div>
+      <div class="fld"><label for="te">Site engineer</label><select id="te">${engineers().map(u=>`<option value="${u.id}" ${u.id===c.engineerId?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="tl">Location</label><input id="tl" value="${esc(c.location)}"></div>
+      <div class="fld"><label for="td">Effective date</label><input id="td" type="date" value="${today()}"></div>
+    </div>
+    <div class="fld"><label for="tx">Reason / note</label><textarea id="tx" rows="2"></textarea></div>
+    <div class="tw" style="border:1px solid var(--line);border-radius:6px"><table class="xt">
+      <thead><tr><th style="width:30px"><input type="checkbox" id="tall" checked aria-label="Select all"></th><th>Item</th><th class="r">Done (approved)</th><th class="r">Remaining</th><th class="r">Remaining amount</th></tr></thead>
+      <tbody>${rows.map((r,i)=>{ const h=r.s!==lastSec?`<tr class="sec"><td></td><td colspan="4">${esc(r.s.no)} ${esc(r.s.title)}</td></tr>`:''; lastSec=r.s; return h+`
+        <tr><td><input type="checkbox" data-x="${i}" checked aria-label="Transfer ${esc(r.it.desc)}"></td><td>${esc(r.it.desc)}</td>
+        <td class="r num">${pct(r.ap)}</td><td class="r num">${pct(r.rem)}</td><td class="r num">${money(r.amt)}</td></tr>`;}).join('')}</tbody>
+      <tfoot><tr><td></td><td colspan="3" style="font-weight:700">Total to transfer</td><td class="r num" id="xtot" style="font-weight:700"></td></tr></tfoot>
+    </table></div>`,
+  'Transfer', async bg=>{
+    const contractor=bg.querySelector('#tc').value.trim(), code=bg.querySelector('#tn').value.trim(), eng=bg.querySelector('#te').value;
+    const loc=bg.querySelector('#tl').value.trim()||c.location, at=bg.querySelector('#td').value||today(), note=bg.querySelector('#tx').value.trim();
+    const sel=rows.filter((r,i)=>bg.querySelector(`[data-x="${i}"]`).checked);
+    if(!contractor) return 'Enter the new contractor.';
+    if(!code) return 'Enter the new Contract No.';
+    if(DB.contracts.some(x=>x.projectCode===code)) return 'Contract No. '+code+' is already used.';
+    if(!sel.length) return 'Select at least one item to transfer.';
+    if(!eng) return 'Select the site engineer.';
+    const amount=r2(sel.reduce((a,r)=>a+r.amt,0));
+    const nc={id:uid('ct'),project:c.project,projectCode:code,contractor,location:loc,...houseFields(c),workType:c.workType,terms:c.terms,retention:c.retention,retSchedule:clone(retSchedule(c)),engineerId:eng,
+      transfers:[],engineerLog:[{at,from:null,to:eng,by:me().name,note:'Created by transfer'}],
+      transferFrom:{contractId:c.id,contractor:c.contractor,code:c.projectCode,location:c.location,at,by:me().name,note},
+      sections:[]};
+    c.sections.forEach(s=>{
+      const its=sel.filter(r=>r.s===s).map(r=>({id:uid('it'),desc:r.it.desc,unit:r.it.unit,qty:r6((+r.it.qty||0)*r.rem),rate:r.it.rate,fromItemId:r.it.id}));
+      if(its.length) nc.sections.push({id:uid('s'),no:s.no,title:s.title,items:its});
+    });
+    const src=clone(c);
+    const selIds=new Set(sel.map(r=>r.it.id));
+    src.sections.forEach(s=>s.items.forEach(it=>{ if(selIds.has(it.id)){ it.cap=r6(approvedPct(c,it.id)); it.transferTo=`${contractor} (${code})`; } }));
+    (src.transfers=src.transfers||[]).push({at,by:me().name,toContractId:nc.id,contractor,code,amount,items:sel.length,note});
+    await persistBatch([src,nc],[]); UI.contractId=nc.id; UI.boqDraft=null; UI.tab='boq';
+    toast(`${usd(amount)} transferred to ${contractor}`); render();
+  }, true);
+  const tot=()=>{ bg.querySelector('#xtot').textContent=money(rows.reduce((a,r,i)=>a+(bg.querySelector(`[data-x="${i}"]`).checked?r.amt:0),0)); };
+  bg.querySelectorAll('[data-x]').forEach(x=>x.onchange=tot);
+  bg.querySelector('#tall').onchange=e=>{ bg.querySelectorAll('[data-x]').forEach(x=>x.checked=e.target.checked); tot(); };
+  tot();
+}
+
+/* ---------- Retention release (RET claims) ----------
+   Retention held = retention of every APPROVED IPC.  Clock (DLP) starts on the date the work became 100% approved.
+   Release schedule is set per contract: 1 or 2 stages, each "% of retention after N months".
+   Each stage is requested by the site engineer (RET claim) and approved by QS, with an optional deduction. */
+const isRet = cl => !!cl && cl.type==='RET';
+const retClaimsOf = c => DB.claims.filter(x=>x.contractId===c.id && isRet(x)).sort((a,b)=>(a.stage-b.stage)||((a.rseq||0)-(b.rseq||0)));
+const retSchedule = c => (Array.isArray(c.retSchedule) && c.retSchedule.length) ? c.retSchedule : [{pct:1,months:12}];
+const addMonthsISO = (iso,m) => { const d=new Date(String(iso).slice(0,10)+'T00:00:00Z'); const day=d.getUTCDate(); d.setUTCMonth(d.getUTCMonth()+(+m||0)); if(d.getUTCDate()<day) d.setUTCDate(0); return d.toISOString().slice(0,10); };
+const approvedAt = cl => { const l=[...(cl.log||[])].reverse().find(x=>x.action==='approved'||x.action==='imported'); return String((l&&l.at)||cl.updatedAt||cl.date||'').slice(0,10); };
+const RSTATE = {
+  held:{en:'Not started',kh:'មិនទាន់ចាប់ផ្តើម',cls:'st-draft'}, waiting:{en:'Waiting',kh:'កំពុងរង់ចាំ',cls:'st-draft'},
+  open:{en:'Open for request',kh:'អាចស្នើបាន',cls:'st-open'}, draft:{en:'Draft',kh:'សេចក្តីព្រាង',cls:'st-draft'},
+  submitted:{en:'Submitted',kh:'បានស្នើ',cls:'st-submitted'}, released:{en:'Released',kh:'បានដោះលែង',cls:'st-approved'}
+};
+function retInfo(c){
+  const appr=claimsOf(c).filter(x=>x.status==='approved');
+  const held=r2(appr.reduce((s,cl)=>s+calc(c,cl).tot.ret.curr,0));
+  const complete=appr.length>0 && !hasRemaining(c);
+  const completedAt=complete ? appr.map(approvedAt).sort().pop() : '';
+  const rets=retClaimsOf(c), now=today(); let acc=0;
+  const sched=retSchedule(c);
+  const stages=sched.map((s,i)=>{
+    const last=i===sched.length-1, amount=last?r2(held-acc):r2(held*(+s.pct||0)); acc=r2(acc+amount);
+    const due=completedAt?addMonthsISO(completedAt,s.months):'';
+    const claim=rets.filter(r=>r.stage===i+1).slice(-1)[0];
+    let state=!complete?'held':(now<due?'waiting':'open');
+    if(claim) state=claim.status==='approved'?'released':claim.status;
+    const daysLeft=due?Math.ceil((Date.parse(due)-Date.parse(now))/864e5):null;
+    return {no:i+1,pct:+s.pct||0,months:+s.months||0,amount,due,state,claim,daysLeft};
+  });
+  const ok=rets.filter(r=>r.status==='approved');
+  const released=r2(ok.reduce((s,r)=>s+(+r.amount||0)-(+r.deduction||0),0)), deducted=r2(ok.reduce((s,r)=>s+(+r.deduction||0),0));
+  return {rate:+c.retention||0,held,complete,completedAt,stages,released,deducted,balance:r2(held-released-deducted),
+          progress:approvedProgress(c)};
+}
+function retBadge(c){
+  const R=retInfo(c); if(!R.complete) return '';
+  if(R.stages.some(s=>s.state==='submitted')) return '<span class="chip st-submitted" style="height:18px;font-size:10.5px">RET submitted</span>';
+  if(R.stages.some(s=>s.state==='open'||s.state==='draft')) return '<span class="chip st-open" style="height:18px;font-size:10.5px">Retention due</span>';
+  if(R.stages.every(s=>s.state==='released')) return '<span class="chip st-approved" style="height:18px;font-size:10.5px">Closed</span>';
+  return '<span class="chip st-approved" style="height:18px;font-size:10.5px">Complete</span>';
+}
+function stateLabel(st){
+  const s=RSTATE[st.state]; let t=s.en;
+  if(st.state==='waiting' && st.daysLeft!=null) t+=` · ${st.daysLeft} day${st.daysLeft===1?'':'s'}`;
+  return `<span class="chip ${s.cls}">${t}</span>`;
+}
+
+/* Retention tab of one house */
+function renderRetention(tb,c){
+  const R=retInfo(c);
+  const sel=retClaimsOf(c).find(x=>x.id===UI.retId) || retClaimsOf(c).find(x=>x.status!=='approved');
+  if(sel) UI.retId=sel.id;
+  const ownsIt=owns(c), hasOpenRet=retClaimsOf(c).some(x=>x.status!=='approved');
+  tb.innerHTML=`
+    <div class="note info">${R.complete
+      ? `Work 100% approved on <b>${fmtDate(R.completedAt)}</b>. The defects liability period (DLP) runs from this date.`
+      : `The DLP starts when all work is 100% approved (now <b>${pct(R.progress)}</b>). Retention keeps building up with each approved IPC.`}</div>
+    <div class="sum" style="margin-top:12px">
+      <div><div class="l">Retention held (${(R.rate*100).toFixed(0)}%)</div><div class="v">${usd(R.held)}</div></div>
+      <div><div class="l">Released</div><div class="v curr">${usd(R.released)}</div></div>
+      <div><div class="l">Deducted</div><div class="v">${usd(R.deducted)}</div></div>
+      <div><div class="l">Balance held</div><div class="v">${usd(R.balance)}</div></div>
+    </div>
+    <div class="tw"><table class="ht" style="min-width:760px">
+      <thead><tr><th>Stage</th><th>Release<small>% of retention</small></th><th>After DLP<small>months</small></th><th>Due date<small>កាលបរិច្ឆេទ</small></th><th>Amount (USD)</th><th>Status</th><th></th></tr></thead>
+      <tbody>${R.stages.map(st=>`<tr>
+        <td class="num">${st.no}</td><td class="r num">${(st.pct*100).toFixed(0)}%</td><td class="r num">${st.months}</td>
+        <td>${st.due?fmtDate(st.due):'<span class="muted">after completion</span>'}</td><td class="r num">${money(st.amount)}</td>
+        <td>${stateLabel(st)}${st.state==='released'&&st.claim&&+st.claim.deduction?`<div class="muted" style="font-size:11.5px">deducted ${money(st.claim.deduction)}</div>`:''}</td>
+        <td style="text-align:right">${st.claim?`<button class="btn sm" data-rv="${st.claim.id}">${st.claim.id===UI.retId?'Showing':'View'}</button>`
+          : (st.state==='open' && ownsIt && !isQS() && !hasOpenRet ? `<button class="btn sm go" data-rq="${st.no}">Request stage ${st.no}</button>` : '')}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <div id="retBox"></div>`;
+  tb.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>{ if(UI.dirty) return toast('Save your changes first.'); UI.retId=b.dataset.rv; renderRetention(tb,c); });
+  tb.querySelectorAll('[data-rq]').forEach(b=>b.onclick=()=>newRet(c,R.stages[+b.dataset.rq-1]));
+  if(sel) renderRetClaim($('#retBox'),c,sel,R);
+}
+async function newRet(c,st){
+  const rets=retClaimsOf(c), rseq=(rets.length?Math.max(...rets.map(x=>x.rseq||0)):0)+1;
+  const lastIpc=claimsOf(c).slice(-1)[0];
+  const cl={id:uid('rt'),contractId:c.id,type:'RET',stage:st.no,rseq,seq:1000+rseq,ipcNo:`RET_${c.projectCode}-${String(st.no).padStart(2,'0')}`,
+    date:today(),status:'draft',amount:st.amount,deduction:0,deductionNote:'',note:'',lines:{},remarks:{},photos:[],
+    preparedBy:me().name,siteManager:lastIpc?(lastIpc.siteManager||''):'',log:[]};
+  addLog(cl,'created');
+  await guard(async()=>{ await persistClaim(cl); UI.retId=cl.id; renderMain(); toast(`${cl.ipcNo} created`); });
+}
+function renderRetClaim(box,c,cl,R){
+  const ed=can.editCurrent(cl,c), rv=can.review(cl);
+  const st=R.stages[cl.stage-1]||{};
+  const lastReturn=[...(cl.log||[])].reverse().find(l=>l.action==='returned');
+  const net=r2((+cl.amount||0)-(+cl.deduction||0));
+  box.innerHTML=`<section class="retclaim">
+    <div class="claimbar"><b>${esc(cl.ipcNo)}</b><span class="muted">Retention release · stage ${cl.stage} (${(st.pct*100||0).toFixed(0)}%)</span>
+      <span class="spacer"></span><span class="chip st-${cl.status}">${STATUS[cl.status].en} · ${STATUS[cl.status].kh}</span>
+      ${!isFramed?'<button class="btn sm" id="rPrint">Print / PDF</button>':''}</div>
+    ${cl.status==='draft'&&lastReturn?`<div class="note bad"><b>Returned by ${esc(lastReturn.by)}:</b> ${esc(lastReturn.note||'')}</div>`:''}
+    ${cl.status==='submitted'&&!isQS()?'<div class="note info">Submitted. Waiting for QS to approve.</div>':''}
+    <div class="form">
+      <div class="fld"><label>Date · កាលបរិច្ឆេទ</label><input id="rDate" type="date" value="${esc(cl.date)}" ${ed?'':'disabled'}></div>
+      <div class="fld"><label>Prepared by (Site Engineer)</label><input value="${esc(cl.preparedBy||'')}" disabled></div>
+      <div class="fld"><label for="rSm">Checked by (Site Manager)</label><input id="rSm" value="${esc(cl.siteManager||'')}" placeholder="Site Manager name" ${ed?'':'disabled'}></div>
+      <div class="fld"><label>Requested amount (USD)</label><input class="num" value="${money(cl.amount)}" disabled></div>
+    </div>
+    <div class="fld" style="padding:0 16px 12px"><label for="rNote">Defect inspection note · កំណត់ត្រាពិនិត្យកំហុស</label>
+      <textarea id="rNote" rows="3" ${ed?'':'disabled'} placeholder="e.g. All tiles checked on site; no cracks or hollow tiles; defects from handover repaired.">${esc(cl.note||'')}</textarea></div>
+    <div class="form" style="padding-top:0">
+      <div class="fld"><label for="rDed">Deduction for defects (QS)</label><input id="rDed" class="num" inputmode="decimal" value="${+cl.deduction?cl.deduction:''}" placeholder="0" ${rv?'':'disabled'}></div>
+      <div class="fld" style="grid-column:span 2"><label for="rDedN">Deduction reason</label><input id="rDedN" value="${esc(cl.deductionNote||'')}" ${rv?'':'disabled'} placeholder="e.g. Contractor did not repair cracked tiles in bathroom 2"></div>
+      <div class="fld"><label>Net release (USD)</label><input id="rNet" class="num" value="${money(net)}" disabled></div>
+    </div>
+    <div class="toolbar"><div class="grow"></div>
+      ${ed?`<button class="btn" id="rSave">Save draft</button><button class="btn go" id="rSubmit">Submit for approval</button><button class="btn danger sm" id="rDel">${UI.delArm===cl.id?'Click again to delete':'Delete draft'}</button>`:''}
+      ${rv?`<button class="btn danger" id="rReturn">Return to engineer</button><button class="btn go" id="rApprove">Approve release</button>`:''}
+    </div>
+    <div id="retPh"></div>
+    ${logList(cl)}
+  </section>`;
+  renderPhotos($('#retPh'),c,cl);
+  const on=(id,fn)=>{const b=$('#'+id); if(b) b.onclick=fn;};
+  const dd=$('#rDate'); if(ed) dd.onchange=()=>{cl.date=dd.value;UI.dirty=true;};
+  if(ed){ $('#rSm').oninput=e=>{cl.siteManager=e.target.value.trim();UI.dirty=true;}; $('#rNote').oninput=e=>{cl.note=e.target.value;UI.dirty=true;}; }
+  if(rv){ const upd=()=>{ $('#rNet').value=money(r2((+cl.amount||0)-(Number($('#rDed').value.replace(',','.'))||0))); }; $('#rDed').oninput=upd; }
+  on('rPrint',()=>doPrintRet(c,cl,R));
+  on('rSave',()=>UI.uploading?toast('Wait until the photos finish uploading.'):guard(async()=>{ await persistClaim(cl); UI.dirty=false; toast('Draft saved'); }));
+  on('rSubmit',async()=>{
+    if(UI.uploading) return toast('Wait until the photos finish uploading.');
+    const fresh=retInfo(c).stages[cl.stage-1];
+    if(!fresh || (fresh.due && today()<fresh.due)) return toast('This stage is not due yet.');
+    if(!(cl.siteManager||'').trim()){ toast('Enter the Site Manager name.'); $('#rSm').focus(); return; }
+    if(!(cl.note||'').trim()){ toast('Write the defect inspection note.'); $('#rNote').focus(); return; }
+    if(!(cl.photos||[]).length) return toast('Add at least one photo of the house condition.');
+    await guard(async()=>{ cl.amount=fresh.amount; cl.status='submitted'; cl.preparedBy=me().name; addLog(cl,'submitted'); await persistClaim(cl); UI.dirty=false; toast('Submitted for approval'); render(); });
+  });
+  on('rDel',async()=>{
+    if(UI.delArm!==cl.id){ UI.delArm=cl.id; renderRetClaim(box,c,cl,R); setTimeout(()=>{ if(UI.delArm===cl.id){UI.delArm=null;} },4000); return; }
+    UI.delArm=null; await guard(async()=>{ await removeClaim(cl); UI.retId=null; UI.dirty=false; toast('Draft deleted'); render(); });
+  });
+  on('rApprove',()=>{
+    const d=Number($('#rDed').value.replace(',','.'))||0, why=$('#rDedN').value.trim();
+    if(d<0||d>(+cl.amount||0)) return toast('Deduction must be between 0 and the requested amount.');
+    if(d>0&&!why){ toast('Write the reason for the deduction.'); $('#rDedN').focus(); return; }
+    guard(async()=>{ cl.deduction=r2(d); cl.deductionNote=why; cl.status='approved'; cl.approvedBy=me().name; addLog(cl,'approved',d?`deducted ${money(d)}: ${why}`:''); await persistClaim(cl); toast(`${cl.ipcNo} approved`); render(); });
+  });
+  on('rReturn',()=>formModal('Return retention request',`<div class="fld"><label for="rr">What needs to change?</label><textarea id="rr" rows="3"></textarea></div>`,'Return',
+    async bg=>{ const n=bg.querySelector('#rr').value.trim(); if(!n) return 'Write the reason.'; cl.status='draft'; addLog(cl,'returned',n); await persistClaim(cl); toast('Returned to engineer'); render(); }));
+}
+
+/* QS overview of all houses in this work */
+function renderRetOverview(m){
+  const f=UI.retFilter||'all';
+  const rows=myContracts().map(c=>{ const R=retInfo(c); const next=R.stages.find(s=>s.state!=='released'); return {c,R,next}; })
+    .filter(x=>f==='all' || (f==='open'&&x.R.stages.some(s=>s.state==='open'||s.state==='draft')) || (f==='submitted'&&x.R.stages.some(s=>s.state==='submitted'))
+      || (f==='waiting'&&x.next&&x.next.state==='waiting') || (f==='held'&&!x.R.complete))
+    .sort((a,b)=>((a.next&&a.next.due)||'9999').localeCompare((b.next&&b.next.due)||'9999'));
+  const tot=rows.reduce((t,x)=>({held:t.held+x.R.held,bal:t.bal+x.R.balance}),{held:0,bal:0});
+  m.innerHTML=`<section class="panel">
+    <div class="head"><div><h2>Retention · ប្រាក់រក្សាទុក</h2><div class="sub">${esc((curWork()||{}).name||'')} · release dates follow each contract's schedule, counted from 100% approval.</div></div>
+      <div class="fld" style="min-width:200px"><label for="rf">Show</label><select id="rf">
+        ${[['all','All houses'],['open','Open for request now'],['submitted','Submitted — waiting QS'],['waiting','DLP running'],['held','Work not complete']].map(([k,l])=>`<option value="${k}" ${f===k?'selected':''}>${l}</option>`).join('')}</select></div></div>
+    <div class="tw"><table class="ht" style="min-width:980px">
+      <thead><tr><th>Location</th><th>Contractor</th><th>Engineer</th><th>Held</th><th>Completed</th><th>Next stage</th><th>Due</th><th>Status</th><th>Balance held</th></tr></thead>
+      <tbody>${rows.length?rows.map(x=>`<tr class="rlink" data-c="${x.c.id}" tabindex="0">
+        <td><b>${esc(x.c.location)}</b><div class="muted num" style="font-size:11.5px">${esc(x.c.projectCode)}</div></td><td>${esc(x.c.contractor)}</td><td>${esc(userName(x.c.engineerId))}</td>
+        <td class="r num">${money(x.R.held)}</td><td>${x.R.complete?fmtDate(x.R.completedAt):`<span class="muted">${pct(x.R.progress)} done</span>`}</td>
+        <td>${x.next?`Stage ${x.next.no} · ${(x.next.pct*100).toFixed(0)}%`:'—'}</td><td>${x.next&&x.next.due?fmtDate(x.next.due):'—'}</td>
+        <td>${x.next?stateLabel(x.next):'<span class="chip st-approved">All released</span>'}</td><td class="r num">${money(x.R.balance)}</td></tr>`).join('')
+        :'<tr><td colspan="9" class="empty">No houses in this list.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="3">Total (${rows.length} houses)</td><td class="r num">${money(tot.held)}</td><td colspan="4"></td><td class="r num">${money(tot.bal)}</td></tr></tfoot>
+    </table></div></section>`;
+  $('#rf').onchange=e=>{ UI.retFilter=e.target.value; renderRetOverview(m); };
+  m.querySelectorAll('.rlink').forEach(tr=>{ const go=()=>{ UI.view='contracts'; UI.contractId=tr.dataset.c; UI.tab='ret'; UI.retId=null; render(); };
+    tr.onclick=go; tr.onkeydown=e=>{ if(e.key==='Enter') go(); }; });
+}
+
+/* Print: retention release claim */
+function doPrintRet(c,cl,R){
+  const st=R.stages[cl.stage-1]||{}, yr=(cl.date||today()).slice(0,4), net=r2((+cl.amount||0)-(+cl.deduction||0));
+  const certified=r2(claimsOf(c).filter(x=>x.status==='approved').reduce((s,x)=>s+calc(c,x).tot.curr,0));
+  const prevRel=r2(retClaimsOf(c).filter(x=>x.status==='approved'&&x.id!==cl.id&&x.stage<cl.stage).reduce((s,x)=>s+(+x.amount||0)-(+x.deduction||0),0));
+  const hd=`<div class="p-hd"><img src="${LOGO}" alt=""><div class="t"><b>${esc(CONFIG.COMPANY)}</b><span>PROJECT : ${esc(c.project)}</span></div><div></div></div>`;
+  const row=(a,b,v,bold)=>`<tr class="${bold?'tot':''}"><td class="c">${a}</td><td>${b}</td><td class="r">${money(v)}</td></tr>`;
+  const page1=`<div class="pg">${hd}<div class="p-title">តារាងស្នើសុំដោះលែងប្រាក់រក្សាទុក / RETENTION RELEASE CLAIM</div>
+    <div class="p-info">
+      <div><span>ឈ្មោះក្រុមហ៊ុន ឬ អ្នកម៉ៅការ ៖</span><b>${esc(c.contractor)}</b></div><div><span>កាលបរិច្ឆេទ ៖</span><b>${fmtDate(cl.date)}</b></div>
+      <div><span>ទីតាំងការងារ ៖</span><b>${esc(c.location)}</b></div><div><span>លេខ ៖</span><b>${esc(cl.ipcNo)}</b></div>
+      <div><span>ប្រភេទនៃការងារ ៖</span><b>${esc(c.workType)}</b></div><div><span>Contract No. ៖</span><b>${esc(c.projectCode)}</b></div>
+      <div><span>បញ្ចប់ការងារ 100% / Completed ៖</span><b>${fmtDate(R.completedAt)}</b></div><div><span>Stage ៖</span><b>${cl.stage} · ${(st.pct*100||0).toFixed(0)}% after ${st.months||0} months (due ${fmtDate(st.due)})</b></div>
+    </div>
+    <table class="pt" style="max-width:720px;margin:6px auto 0"><thead><tr><th style="width:60px">លរ</th><th>បរិយាយ / DESCRIPTION</th><th style="width:150px">AMOUNT (USD)</th></tr></thead><tbody>
+      ${row('1','តម្លៃកិច្ចសន្យា / Contract value',contractValue(c))}
+      ${row('2','ការងារបានទូទាត់សរុប / Total certified (approved IPCs)',certified)}
+      ${row('3',`ទឹកប្រាក់រក្សាទុកសរុប / Total retention held (${(R.rate*100).toFixed(0)}%)`,R.held)}
+      ${row('4','បានដោះលែងលើកមុន / Released before',prevRel)}
+      ${row('5',`ស្នើដោះលែងលើកនេះ / This release — stage ${cl.stage} (${(st.pct*100||0).toFixed(0)}%)`,cl.amount,true)}
+      ${row('6',`កាត់ចេញ / Less deduction${cl.deductionNote?' — '+esc(cl.deductionNote):''}`,-(+cl.deduction||0))}
+      ${row('7','ទឹកប្រាក់ត្រូវទទួលបាន / NET RELEASE AMOUNT',net,true)}
+    </tbody></table>
+    <div style="max-width:720px;margin:10px auto 0;font-size:11px;border:1px solid #555;padding:6px 8px;min-height:50px"><b>កំណត់ត្រាពិនិត្យកំហុស / Defect inspection:</b> ${esc(cl.note||'')}</div>
+    <div class="sig">
+      <div>ធ្វើបញ្ជីដោយ / Prepared by<div class="ln"></div>លោក ${esc(cl.preparedBy||'')}<br>វិស្វករការដ្ឋាន / Site Engineer<br>ថ្ងៃទី ........ / ........ / ${yr}</div>
+      <div>ត្រួតពិនិត្យដោយ / Checked by<div class="ln"></div>លោក ${esc(cl.siteManager||'')}<br>ប្រធានការដ្ឋាន / Site Manager<br>ថ្ងៃទី ........ / ........ / ${yr}</div>
+      <div>យល់ព្រមដោយ / Agreed by<div class="ln"></div>លោក ${esc(c.contractor||'')}<br>អ្នកម៉ៅការ / Sub-contractor<br>ថ្ងៃទី ........ / ........ / ${yr}</div>
+    </div></div>`;
+  const ph=cl.photos||[], pages=[];
+  for(let i=0;i<ph.length;i+=6) pages.push(`<div class="pg">${hd}<div class="p-title">រូបភាពពិនិត្យស្ថានភាពការងារ / DEFECT INSPECTION PHOTOS</div>
+    <div class="p-info"><div><span>ទីតាំងការងារ ៖</span><b>${esc(c.location)}</b></div><div><span>លេខ ៖</span><b>${esc(cl.ipcNo)}</b></div></div>
+    <div class="pp">${ph.slice(i,i+6).map((p,j)=>`<figure><div class="im"><img src="${esc(p.src)}" alt=""></div><figcaption><b>${i+j+1}</b>${esc(p.caption||'')}</figcaption></figure>`).join('')}</div></div>`);
+  $('#print').innerHTML=page1+pages.join('');
+  const imgs=[...$('#print').querySelectorAll('img')];
+  Promise.all(imgs.map(im=>im.complete?1:new Promise(r=>{im.onload=im.onerror=r;}))).then(()=>window.print());
+}
+
+/* ---------- Claim summary for Finance (QS) ----------
+   One table for ALL works of this project, same columns as "SUMMARY LABOR CLAIM" in TOTAL_SUMMARY_TO_FINANCE.xlsx:
+   No · Request By · Type House · Block · N · BOQ · CLAIMED · BALANCE · THIS CLAIM · Retention · REQUEST · SUBCON. · SCOPE OF WORK · REMARK */
+const XLSX_URL='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+function loadXlsx(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src=XLSX_URL; sc.onload=res; sc.onerror=()=>rej(new Error('Could not load the Excel writer. Check the internet connection.')); document.head.appendChild(sc); });
+}
+const ipcCurr = (c,cl) => allItems(c).reduce((t,it)=>t+r2(itemAmt(it)*(+((cl.lines||{})[it.id])||0)),0);
+async function fetchProject(){
+  if(apiUrl()) return (await call('exportAll')).works;
+  return LS.get(KEY.works,[]).map(w=>{ const d=LS.get(KEY.data(w.id),{contracts:[],claims:[]}); return {id:w.id,name:w.name,contracts:d.contracts||[],claims:d.claims||[]}; });
+}
+function summaryRows(works,o){
+  const rows=[];
+  works.forEach(w=>{
+    const byC={}; (w.claims||[]).forEach(cl=>{ (byC[cl.contractId]=byC[cl.contractId]||[]).push(cl); });
+    (w.contracts||[]).forEach(c=>{
+      const cs=byC[c.id]||[], h=houseFields(c), boq=netValue(c), rate=+c.retention||0;
+      const ipcAppr=cs.filter(x=>x.type!=='RET'&&x.status==='approved');
+      cs.forEach(cl=>{
+        if(!(cl.date>=o.from && cl.date<=o.to)) return;
+        if(!o.status.includes(cl.status)) return;
+        const ret=cl.type==='RET';
+        if(ret ? !o.inclRet : !o.inclIpc) return;
+        let thisClaim, retAmt, request, claimed, remark=[];
+        if(ret){
+          claimed=r2(ipcAppr.reduce((t,x)=>t+ipcCurr(c,x),0));
+          thisClaim=r2((+cl.amount||0)-(+cl.deduction||0)); retAmt=0; request=thisClaim;
+          remark.push(`Retention release stage ${cl.stage}`); if(+cl.deduction) remark.push(`deducted ${money(cl.deduction)}${cl.deductionNote?' ('+cl.deductionNote+')':''}`);
+        } else {
+          thisClaim=r2(ipcCurr(c,cl));
+          const prev=ipcAppr.filter(x=>x.seq<cl.seq).reduce((t,x)=>t+ipcCurr(c,x),0);
+          claimed=r2(prev+thisClaim); retAmt=r2(thisClaim*rate); request=r2(thisClaim-retAmt);
+        }
+        remark.unshift(cl.ipcNo); if(cl.status!=='approved') remark.push(STATUS[cl.status].en);
+        rows.push({requestBy:cl.preparedBy||'',houseType:h.houseType,block:h.block,houseNo:h.houseNo,location:c.location,boq:r2(boq),claimed,balance:r2(boq-claimed),
+          thisClaim,ret:retAmt,request,subcon:c.contractor||'',scope:c.workType||w.name,work:w.name,remark:remark.join(' · '),date:cl.date,type:ret?'RET':'IPC'});
+      });
+    });
+  });
+  rows.sort((a,b)=>natCmp(a.requestBy,b.requestBy)||natCmp(a.houseType,b.houseType)||natCmp(a.block,b.block)||natCmp(a.houseNo,b.houseNo)||natCmp(a.scope,b.scope));
+  return rows;
+}
+function periodDefault(){            // 1–15 or 16–end of the current month (your pay periods)
+  const d=new Date(), y=d.getFullYear(), m=d.getMonth(), day=d.getDate(), p=n=>String(n).padStart(2,'0');
+  if(day<=15) return {from:`${y}-${p(m+1)}-01`,to:`${y}-${p(m+1)}-15`};
+  const last=new Date(y,m+1,0).getDate(); return {from:`${y}-${p(m+1)}-16`,to:`${y}-${p(m+1)}-${p(last)}`};
+}
+function renderSummary(m){
+  UI.sum=UI.sum||Object.assign(periodDefault(),{status:['approved'],inclIpc:true,inclRet:true,title:'CIVIL WORK',rows:null,works:null});
+  const o=UI.sum;
+  const rows=o.rows||[];
+  const T=rows.reduce((t,r)=>({boq:t.boq+r.boq,claimed:t.claimed+r.claimed,this:t.this+r.thisClaim,ret:t.ret+r.ret,req:t.req+r.request}),{boq:0,claimed:0,this:0,ret:0,req:0});
+  const bySub={}; rows.forEach(r=>{ bySub[r.subcon]=(bySub[r.subcon]||0)+r.request; });
+  const byWork={}; rows.forEach(r=>{ byWork[r.work]=(byWork[r.work]||0)+r.request; });
+  m.innerHTML=`<section class="panel">
+    <div class="head"><div><h2>Claim summary · តារាងសង្ខេប</h2><div class="sub">All works of ${esc(PROJECT_NAME)} in one table for Finance — same columns as your “SUMMARY LABOR CLAIM” sheet.</div></div></div>
+    <div class="form" style="padding-top:0">
+      <div class="fld"><label for="sf">Claim date from</label><input id="sf" type="date" value="${esc(o.from)}"></div>
+      <div class="fld"><label for="st">to</label><input id="st" type="date" value="${esc(o.to)}"></div>
+      <div class="fld"><label for="ss">Status</label><select id="ss">
+        <option value="approved" ${o.status.join()==='approved'?'selected':''}>Approved only</option>
+        <option value="submitted" ${o.status.join()==='submitted'?'selected':''}>Submitted (waiting QS)</option>
+        <option value="approved,submitted" ${o.status.join()==='approved,submitted'?'selected':''}>Approved + submitted</option></select></div>
+      <div class="fld"><label for="stl">Title: SUMMARY LABOR CLAIM –</label><input id="stl" value="${esc(o.title)}"></div>
+    </div>
+    <div class="toolbar" style="padding-top:0">
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="si" ${o.inclIpc?'checked':''}> IPC claims</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="sr" ${o.inclRet?'checked':''}> Retention releases</label>
+      <div class="grow"></div>
+      <button class="btn pri" id="sGo">${o.rows?'Refresh':'Make summary'}</button>
+      ${o.rows&&rows.length?`<button class="btn go" id="sXl">Download Excel</button>${!isFramed?'<button class="btn" id="sPr">Print</button>':''}`:''}
+    </div>
+    ${!o.rows?'<div class="empty">Choose the period and click “Make summary”. It reads every work (Sheet file) of this project.</div>'
+    : !rows.length?'<div class="empty">No claims in this period with this status.</div>'
+    : `<div class="tw"><table class="ht sumt">
+      <thead><tr><th>No.</th><th>Request By</th><th>Type House</th><th>Block</th><th>N</th><th>BOQ</th><th>CLAIMED</th><th>BALANCE</th><th>THIS CLAIM</th><th>RETENTION</th><th>REQUEST</th><th>SUBCON.</th><th>SCOPE OF WORK</th><th>REMARK</th></tr></thead>
+      <tbody>${rows.map((r,i)=>`<tr class="${r.type==='RET'?'retrow':''}"><td class="num">${i+1}</td><td>${esc(r.requestBy)}</td><td>${esc(r.houseType)}</td><td>${esc(r.block)}</td><td>${esc(r.houseNo)}</td>
+        <td class="r num">${money(r.boq)}</td><td class="r num">${money(r.claimed)}</td><td class="r num">${money(r.balance)}</td><td class="r num"><b>${money(r.thisClaim)}</b></td>
+        <td class="r num">${money(r.ret)}</td><td class="r num"><b>${money(r.request)}</b></td><td>${esc(r.subcon)}</td><td>${esc(r.scope)}</td><td style="font-size:11.5px">${esc(r.remark)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="8">TOTAL CLAIM · ${rows.length} line${rows.length>1?'s':''}</td><td class="r num">${money(T.this)}</td><td class="r num">${money(T.ret)}</td><td class="r num">${money(T.req)}</td><td colspan="3"></td></tr></tfoot>
+    </table></div>
+    <div class="sumside">
+      <div><h4>Request by sub-contractor</h4><table class="ht"><tbody>${Object.entries(bySub).sort((a,b)=>natCmp(a[0],b[0])).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${money(v)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Grand total</td><td class="r num">${money(T.req)}</td></tr></tfoot></table></div>
+      <div><h4>Request by work</h4><table class="ht"><tbody>${Object.entries(byWork).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="r num">${money(v)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Grand total</td><td class="r num">${money(T.req)}</td></tr></tfoot></table></div>
+    </div>`}
+  </section>`;
+  const read=()=>{ o.from=$('#sf').value; o.to=$('#st').value; o.status=$('#ss').value.split(','); o.title=$('#stl').value.trim()||'CIVIL WORK'; o.inclIpc=$('#si').checked; o.inclRet=$('#sr').checked; };
+  ['#sf','#st','#ss','#si','#sr'].forEach(id=>$(id).onchange=()=>{ read(); if(o.works){ o.rows=summaryRows(o.works,o); renderSummary(m); } });
+  $('#stl').oninput=()=>{ o.title=$('#stl').value; };
+  $('#sGo').onclick=()=>guard(async()=>{ read(); if(!o.from||!o.to||o.from>o.to) return toast('Check the dates.');
+    $('#sGo').disabled=true; $('#sGo').textContent='Reading all works…'; o.works=await fetchProject(); o.rows=summaryRows(o.works,o); renderSummary(m);
+    const bad=o.works.filter(w=>w.error); if(bad.length) toast(`Could not read: ${bad.map(w=>w.name).join(', ')}`); });
+  const xl=$('#sXl'); if(xl) xl.onclick=()=>guard(()=>downloadSummaryXlsx(o));
+  const pr=$('#sPr'); if(pr) pr.onclick=()=>printSummary(o);
+}
+const sumTitleDate = to => new Date(to+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}).toUpperCase();
+async function downloadSummaryXlsx(o){
+  await loadXlsx();
+  const rows=o.rows, H=['No.','Request By','Type House','Block','N','BOQ','CLAIMED','BALANCE','THIS CLAIM',(rows.length?'Retention':'Retention'),'REQUEST','SUBCON.','SCOPE OF WORK','REMARK'];
+  const aoa=[[`SUMMARY LABOR CLAIM - ${o.title}`],[`PROJECT: ${PROJECT_NAME}`],[`ON ${sumTitleDate(o.to)}`],H];
+  rows.forEach((r,i)=>aoa.push([i+1,r.requestBy,r.houseType,r.block,r.houseNo,r.boq,r.claimed,null,r.thisClaim,r.ret,null,r.subcon,r.scope,r.remark]));
+  const first=5, last=4+rows.length;
+  aoa.push(['TOTAL CLAIM',null,null,null,null,null,null,null,null,null,null]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  for(let r=first;r<=last;r++){ ws['H'+r]={t:'n',f:`F${r}-G${r}`}; ws['K'+r]={t:'n',f:`I${r}-J${r}`}; }
+  const tr=last+1; ['I','J','K'].forEach(col=>ws[col+tr]={t:'n',f:`SUBTOTAL(9,${col}${first}:${col}${last})`});
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:13}},{s:{r:1,c:0},e:{r:1,c:13}},{s:{r:2,c:0},e:{r:2,c:13}},{s:{r:tr-1,c:0},e:{r:tr-1,c:7}}];
+  ws['!cols']=[6,18,26,9,10,11,11,11,12,10,12,18,30,34].map(w=>({wch:w}));
+  Object.keys(ws).forEach(k=>{ if(/^[F-K]\d+$/.test(k) && ws[k].t==='n') ws[k].z='#,##0.00'; });
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'SUMMARY');
+  const bySub={}; rows.forEach(r=>{ bySub[r.subcon]=(bySub[r.subcon]||0)+r.request; });
+  const ps=XLSX.utils.aoa_to_sheet([['Sub-contractor','Sum of REQUEST'],...Object.entries(bySub).sort((a,b)=>natCmp(a[0],b[0])).map(([k,v])=>[k,r2(v)]),['Grand Total',r2(rows.reduce((t,r)=>t+r.request,0))]]);
+  ps['!cols']=[{wch:28},{wch:16}]; XLSX.utils.book_append_sheet(wb,ps,'By sub-contractor');
+  const yymmdd=o.to.slice(2).replace(/-/g,'');
+  XLSX.writeFile(wb,`SUMMARY_${yymmdd}(${PROJECT_NAME.replace(/[\\/:*?"<>|]+/g,'')} ${o.title.replace(/[\\/:*?"<>|]+/g,'')}).xlsx`);
+  toast('Excel downloaded');
+}
+function printSummary(o){
+  const rows=o.rows, T=rows.reduce((t,r)=>({this:t.this+r.thisClaim,ret:t.ret+r.ret,req:t.req+r.request}),{this:0,ret:0,req:0});
+  $('#print').innerHTML=`<div class="pg"><div style="text-align:center;font-weight:700;font-size:14px">SUMMARY LABOR CLAIM - ${esc(o.title)}</div>
+    <div style="text-align:center;font-weight:700;font-size:12px">PROJECT: ${esc(PROJECT_NAME)}</div><div style="text-align:center;font-size:12px;margin-bottom:6px">ON ${sumTitleDate(o.to)}</div>
+    <table class="pt"><thead><tr><th>No.</th><th>Request By</th><th>Type House</th><th>Block</th><th>N</th><th>BOQ</th><th>CLAIMED</th><th>BALANCE</th><th>THIS CLAIM</th><th>RETENTION</th><th>REQUEST</th><th>SUBCON.</th><th>SCOPE OF WORK</th><th>REMARK</th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${esc(r.requestBy)}</td><td>${esc(r.houseType)}</td><td class="c">${esc(r.block)}</td><td class="c">${esc(r.houseNo)}</td><td class="r">${money(r.boq)}</td><td class="r">${money(r.claimed)}</td><td class="r">${money(r.balance)}</td><td class="r">${money(r.thisClaim)}</td><td class="r">${money(r.ret)}</td><td class="r">${money(r.request)}</td><td>${esc(r.subcon)}</td><td>${esc(r.scope)}</td><td>${esc(r.remark)}</td></tr>`).join('')}
+    <tr class="tot"><td colspan="8">TOTAL CLAIM</td><td class="r">${money(T.this)}</td><td class="r">${money(T.ret)}</td><td class="r">${money(T.req)}</td><td colspan="3"></td></tr></tbody></table></div>`;
+  setTimeout(()=>window.print(),50);
+}
+
+/* ---------- Users (QS) ---------- */
+function renderUsers(m){
+  const list=[...DB.users].sort((a,b)=>(a.role+a.name).localeCompare(b.role+b.name));
+  const count=id=>DB.contracts.filter(c=>c.engineerId===id).length;
+  m.innerHTML=`<section class="panel">
+    <div class="head"><div><h2>Users · អ្នកប្រើប្រាស់</h2><div class="sub">Each engineer signs in with their own account and sees only the houses assigned to them.</div></div>
+      <div><button class="btn pri" id="btnAddU">+ Add user</button></div></div>
+    <div class="tw"><table class="ut">
+      <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Houses</th><th>Status</th><th style="width:220px"></th></tr></thead>
+      <tbody>${list.map(u=>`<tr class="${u.active===false?'off':''}">
+        <td><b>${esc(u.name)}</b>${u.id===me().id?' <span class="muted">(you)</span>':''}</td><td class="num">${esc(u.username||'')}</td>
+        <td>${ROLES[u.role]?ROLES[u.role].en:esc(u.role)}</td><td class="num">${u.role==='SE'?count(u.id):''}</td>
+        <td>${u.active===false?'<span class="chip st-draft">Inactive</span>':'<span class="chip st-approved">Active</span>'}</td>
+        <td style="text-align:right"><button class="btn sm" data-edit="${u.id}">Edit / reset password</button></td></tr>`).join('')}</tbody>
+    </table></div></section>`;
+  $('#btnAddU').onclick=()=>openUser(null);
+  m.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openUser(DB.users.find(u=>u.id===b.dataset.edit)));
+}
+function openUser(u){
+  const isNew=!u, self=u&&u.id===me().id;
+  formModal(isNew?'Add user':'Edit user',`<div class="mgrid">
+      <div class="fld"><label for="un">Full name (prints on claims)</label><input id="un" value="${esc(u?u.name:'')}"></div>
+      <div class="fld"><label for="uu">Username</label><input id="uu" value="${esc(u?u.username:'')}" autocapitalize="none" ${isNew?'':'disabled'}></div>
+      <div class="fld"><label for="ur">Role</label><select id="ur" ${self?'disabled':''}>${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${(u?u.role:'SE')===k?'selected':''}>${v.en} · ${v.kh}</option>`).join('')}</select></div>
+      <div class="fld"><label for="up">${isNew?'Password':'New password (leave empty to keep)'}</label><input id="up" type="text" autocomplete="new-password" placeholder="At least 4 characters"></div>
+    </div>
+    ${isNew||self?'':`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ua" ${u.active!==false?'checked':''}> Active (can sign in)</label>`}
+    ${!isNew&&u.role==='SE'&&DB.contracts.some(c=>c.engineerId===u.id)?'<div class="muted" style="font-size:12.5px">Before deactivating an engineer, move their houses with “Change engineer”.</div>':''}`,
+  isNew?'Add user':'Save', async bg=>{
+    const name=bg.querySelector('#un').value.trim(), username=bg.querySelector('#uu').value.trim().toLowerCase(), role=bg.querySelector('#ur').value, pw=bg.querySelector('#up').value;
+    const act=bg.querySelector('#ua'); const active=act?act.checked:true;
+    if(!name) return 'Enter the full name.';
+    if(!/^[a-z0-9._-]{3,}$/.test(username)) return 'Username: at least 3 characters, letters/numbers/._- only.';
+    if(isNew&&pw.length<4) return 'Password must be at least 4 characters.';
+    if(pw&&pw.length<4) return 'Password must be at least 4 characters.';
+    if(!active && DB.contracts.some(c=>c.engineerId===u.id)) return 'This engineer still has houses. Change engineer on those houses first.';
+    await saveUser({id:u?u.id:uid('u'),username,name,role:self?u.role:role,active},pw);
+    if(self){ SESSION.user.name=name; setSession(SESSION); }
+    toast(isNew?'User added':'User saved'); render();
+  });
+}
+function openChangePassword(){
+  formModal('Change my password',`
+    <div class="fld"><label for="p0">Current password</label><input id="p0" type="password" autocomplete="current-password"></div>
+    <div class="fld"><label for="p1">New password</label><input id="p1" type="password" autocomplete="new-password"></div>
+    <div class="fld"><label for="p2">Repeat new password</label><input id="p2" type="password" autocomplete="new-password"></div>`,
+  'Change password', async bg=>{
+    const a=bg.querySelector('#p0').value,b=bg.querySelector('#p1').value,c=bg.querySelector('#p2').value;
+    if(b.length<4) return 'New password must be at least 4 characters.';
+    if(b!==c) return 'The new passwords do not match.';
+    await changeMyPassword(a,b); toast('Password changed');
+  });
+}
+
+/* ---------- modal helpers / settings ---------- */
+function formModal(title,body,okLabel,onSubmit,wide){
+  const bg=document.createElement('div'); bg.className='modal-bg';
+  bg.innerHTML=`<form class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><h3>${esc(title)}</h3>
+    ${body}<div class="note bad mErr" style="margin:0" hidden></div>
+    <div class="row"><button type="button" class="btn mNo">Cancel</button><button type="submit" class="btn pri mOk">${esc(okLabel)}</button></div></form>`;
+  document.body.appendChild(bg);
+  const f=bg.querySelector('form'), err=bg.querySelector('.mErr'), ok=bg.querySelector('.mOk');
+  const first=f.querySelector('input:not([type=checkbox]):not([disabled]),select,textarea'); if(first) first.focus();
+  const close=()=>bg.remove();
+  bg.querySelector('.mNo').onclick=close;
+  bg.onkeydown=e=>{ if(e.key==='Escape') close(); };
+  f.onsubmit=async e=>{
+    e.preventDefault(); ok.disabled=true; err.hidden=true;
+    try{ const msg=await onSubmit(bg); if(msg){ err.textContent=msg; err.hidden=false; ok.disabled=false; return; } close(); }
+    catch(ex){ err.textContent=ex.message; err.hidden=false; ok.disabled=false; }
+  };
+  return bg;
+}
+// Read-only: shows which database this file uses. To change it, edit WEBAPP_URL at the top of the file.
+function openSettings(){
+  const url=apiUrl();
+  formModal('Connection',`
+    ${url?`<div class="muted" style="font-size:13px">This file is connected to:</div>
+      <div class="note info" style="margin:0;overflow-wrap:anywhere;font-family:var(--f-num);font-size:12px">${esc(url)}</div>
+      <div class="muted" style="font-size:13px">To use another database, change <b>WEBAPP_URL</b> at the top of the HTML file (line 11).</div>`
+    :`<div class="muted" style="font-size:13px">Demo mode: data stays in this browser. Set <b>WEBAPP_URL</b> at the top of the HTML file to connect to Google Sheets.</div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="sReset"> Reset demo data</label>`}`,
+  url?'Close':'Save', async bg=>{
+    const rs=bg.querySelector('#sReset');
+    if(rs&&rs.checked){ (LS.get(KEY.works,[])||[]).forEach(w=>LS.del(KEY.data(w.id))); LS.del(KEY.works); LS.del(KEY.users); UI.work=''; setSession(null); setTimeout(boot,0); }
+  });
+}
+
+/* ---------- print ---------- */
+function doPrint(c,cl){
+  const k=calc(c,cl), T=k.tot, P=x=>T.amt?x/T.amt:0; const yr=(cl.date||today()).slice(0,4);
+  const hd=`<div class="p-hd"><img src="${LOGO}" alt=""><div class="t"><b>${esc(CONFIG.COMPANY)}</b><span>PROJECT : ${esc(c.project)}</span></div><div></div></div>`;
+  const info=`<div class="p-info">
+    <div><span>ឈ្មោះក្រុមហ៊ុន ឬ អ្នកម៉ៅការ ៖</span><b>${esc(c.contractor)}</b></div><div><span>កាលបរិច្ឆេទ ៖</span><b>${fmtDate(cl.date)}</b></div>
+    <div><span>ទីតាំងការងារ ៖</span><b>${esc(c.location)}</b></div><div><span>លេខ IPC ៖</span><b>${esc(cl.ipcNo)}</b></div>
+    <div><span>ប្រភេទនៃការងារ ៖</span><b>${esc(c.workType)}</b></div><div><span>ស្ថានភាព / Status ៖</span><b>${STATUS[cl.status].kh} / ${STATUS[cl.status].en}</b></div>
+    <div><span>លក្ខខណ្ឌនៃការទូទាត់ប្រាក់ ៖</span><b>${esc(c.terms)}</b></div>${c.transferFrom?`<div><span>ទទួលបន្តពី / Taken over from ៖</span><b>${esc(c.transferFrom.contractor)} (${esc(c.transferFrom.code)})</b></div>`:''}</div>`;
+  let n;
+  const page1=`<div class="pg">${hd}<div class="p-title">តារាងស្នើសុំទូទាត់ប្រាក់ការងារសាងសង់ / INTERIM PAYMENT CLAIM</div>${info}
+   <table class="pt"><thead>
+    <tr><th rowspan="2">លរ<br>ITEM</th><th rowspan="2">បរិយាយ<br>DESCRIPTION</th><th rowspan="2">ឯកតា<br>UNIT</th><th colspan="3">កិច្ចសន្យា / CONTRACT</th><th colspan="2">ទូទាត់លើកមុន / PREVIOUS</th><th colspan="2">ទូទាត់លើកនេះ / CURRENT</th><th colspan="2">សរុបទូទាត់ / CUMULATIVE</th><th rowspan="2">ផ្សេងៗ<br>REMARK</th></tr>
+    <tr><th>QTY</th><th>RATE (USD)</th><th>AMOUNT (USD)</th><th>AMOUNT</th><th>%</th><th>AMOUNT</th><th>%</th><th>AMOUNT</th><th>%</th></tr></thead><tbody>
+    ${k.sections.map(S=>{n=0;return `<tr class="sec"><td class="c">${esc(S.sec.no)}</td><td colspan="4">${esc(S.sec.title)}</td><td class="r">${money(S.amt)}</td><td class="r">${money(S.prev)}</td><td></td><td class="r">${money(S.curr)}</td><td></td><td class="r">${money(S.cum)}</td><td></td><td></td></tr>
+      ${S.rows.map(R=>{n++;return `<tr><td class="c">${n}</td><td>${esc(R.it.desc)}</td><td class="c">${esc(R.it.unit)}</td><td class="r">${(+R.it.qty).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:4})}</td><td class="r">${money(R.it.rate)}</td><td class="r">${money(R.amt)}</td>
+        <td class="r pv">${money(R.prev)}</td><td class="r pv">${pct(R.pp)}</td><td class="r cu">${money(R.curr)}</td><td class="r cu">${pct(R.cp)}</td><td class="r">${money(R.cum)}</td><td class="r">${pct(R.cumP)}</td><td>${R.it.transferTo?'ផ្ទេរទៅ / To: '+esc(R.it.transferTo)+' ':''}${esc(cl.remarks[R.it.id]||'')}</td></tr>`}).join('')}`}).join('')}
+    ${[['[ I ]','សរុបទឹកប្រាក់ស្នើសុំទូទាត់ / TOTAL INTERIM PAYMENT CLAIM',T],['[ II ]',`ទឹកប្រាក់រក្សាទុក / RETENTION ( [ II ] = [ I ] x ${((+c.retention||0)*100).toFixed(0)}% )`,T.ret],['[ III ]','ទឹកប្រាក់ត្រូវទទួលបាន / RECEIVED AMOUNT ( [ III ] = [ I ] - [ II ] )',T.net]]
+      .map(([a,b,o])=>`<tr class="tot"><td class="c">${a}</td><td colspan="4">${b}</td><td class="r">${money(o.amt)}</td><td class="r pv">${money(o.prev)}</td><td class="r pv">${pct(P(o.prev))}</td><td class="r cu">${money(o.curr)}</td><td class="r cu">${pct(P(o.curr))}</td><td class="r">${money(o.cum)}</td><td class="r">${pct(P(o.cum))}</td><td></td></tr>`).join('')}
+   </tbody></table>
+   <div class="sig">
+     <div>ធ្វើបញ្ជីដោយ / Prepared by<div class="ln"></div>លោក ${esc(cl.preparedBy||'')}<br>វិស្វករការដ្ឋាន / Site Engineer<br>ថ្ងៃទី ........ / ........ / ${yr}</div>
+     <div>ត្រួតពិនិត្យដោយ / Checked by<div class="ln"></div>លោក ${esc(cl.siteManager||'')}<br>ប្រធានការដ្ឋាន / Site Manager<br>ថ្ងៃទី ........ / ........ / ${yr}</div>
+     <div>យល់ព្រមដោយ / Agreed by<div class="ln"></div>លោក ${esc(c.contractor||'')}<br>អ្នកម៉ៅការ / Sub-contractor<br>ថ្ងៃទី ........ / ........ / ${yr}</div>
+   </div></div>`;
+  const ph=cl.photos||[]; const pages=[];
+  for(let i=0;i<ph.length;i+=6){
+    pages.push(`<div class="pg">${hd}<div class="p-title">រូបភាពនៃការងារស្នើសុំទូទាត់ / PHOTO PROGRESSIVE WORK</div>
+      <div class="p-info"><div><span>អ្នកម៉ៅការ ៖</span><b>${esc(c.contractor)}</b></div><div><span>កាលបរិច្ឆេទ ៖</span><b>${fmtDate(cl.date)}</b></div>
+      <div><span>ទីតាំងការងារ ៖</span><b>${esc(c.location)}</b></div><div><span>លេខ IPC ៖</span><b>${esc(cl.ipcNo)}</b></div></div>
+      <div class="pp">${ph.slice(i,i+6).map((p,j)=>`<figure><div class="im"><img src="${esc(p.src)}" alt=""></div><figcaption><b>${i+j+1}</b>${esc(p.caption||'')}</figcaption></figure>`).join('')}</div></div>`);
+  }
+  $('#print').innerHTML=page1+pages.join('');
+  const imgs=[...$('#print').querySelectorAll('img')];
+  Promise.all(imgs.map(im=>im.complete?1:new Promise(r=>{im.onload=im.onerror=r;}))).then(()=>window.print());
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  $('#app').innerHTML='<div class="empty" style="padding:60px">Loading…</div>';
+  try{
+    if(!apiUrl()){
+      await demoInit(); DB.users=LS.get(KEY.users,[]);
+      if(SESSION){ const u=DB.users.find(x=>x.id===SESSION.user.id && x.active!==false); if(!u) setSession(null); else SESSION.user={id:u.id,username:u.username,name:u.name,role:u.role}; }
+    }
+    if(!SESSION) return renderLogin();
+    await enterApp();
+  }catch(e){
+    if(e.message==='Signed out') return;
+    console.error(e);
+    $('#app').innerHTML=`<div class="login"><div class="lcard"><h2>Can't reach Google Sheets</h2><div class="note bad" style="margin:0">${esc(e.message)}</div><div class="muted" style="font-size:13px">Check the Web App URL, or clear it to use Demo mode.</div><button class="btn" id="bSet">Connection settings</button></div></div>`;
+    $('#bSet').onclick=openSettings;
+  }
+}
+try{ if(PROJECT_NAME) document.title=PROJECT_NAME+' · IPC Payment Claims'; }catch(e){}
+window.addEventListener('beforeunload',e=>{ if(UI.dirty){ e.preventDefault(); e.returnValue=''; } });
+boot();
+</script>
+
+</body>
+</html>
