@@ -326,7 +326,7 @@ table.sumt{min-width:1500px;font-size:12.5px}
    ===================================================================== */
 const CONFIG = {
   DATABASES: /^https:\/\//.test(WEBAPP_URL) ? [{ key: 'p'+[...WEBAPP_URL].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7).toString(36), name: PROJECT_NAME, url: WEBAPP_URL }] : [],
-  API_URL: '',                 // leave empty — set WEBAPP_URL at the top instead
+  API_URL: 'https://script.google.com/macros/s/AKfycbypP1ljOAGujv7xw6iIOC7Hcx-JI5Bq30DZRJAJ4wjYtjRMOY10l2Zx4dm1AImttrhDsA/exec',                 // leave empty — set WEBAPP_URL at the top instead
   COMPANY: 'LAVISH HOME BUILD',
   MAX_PHOTOS: 12,
   PHOTO_MAX_PX: 1200,          // long side in px — sharp enough for the A4 photo page
